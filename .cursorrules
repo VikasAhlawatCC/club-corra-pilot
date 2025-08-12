@@ -1,0 +1,200 @@
+# Cursor Rules
+
+These rules guide Cursor AI for this repo. Follow them strictly unless a task explicitly overrides a rule.
+
+---
+
+## Project Map
+
+* **Monorepo:** Yarn Workspaces + Turborepo
+* **Apps**
+
+  * `apps/admin` → Next.js (hosted on Vercel)
+  * `apps/mobile` → Expo (React Native, EAS Build/Submit)
+  * `apps/api` → NestJS (Dockerized; deploy to AWS EC2/App Runner/ECS)
+* **Packages**
+
+  * `packages/shared` → TypeScript types, Zod schemas, utilities (shared web/mobile/backend)
+* **Package manager**
+
+  * Yarn Berry with `.yarnrc.yml` set to `nodeLinker: node-modules`
+  * **Never** switch package managers or enable PnP.
+
+---
+
+## Tech Choices (Do not change)
+
+* **Web (Admin):** Next.js + Tailwind CSS + shadcn/ui
+* **Mobile:** React Native (Expo)
+
+  * Styling: **NativeWind** (Tailwind for RN) or **Tamagui** (if cross‑platform UI is needed)
+* **Backend:** NestJS + **TypeORM** (migrations required; no `synchronize` in prod)
+* **Database:** PostgreSQL (Neon). Use pooled connection string; region close to backend.
+* **Storage/CDN:** S3 for uploads/static; CloudFront in front of S3; use signed URLs.
+* **Auth:** Auth.js (NextAuth) **or** Clerk/Auth0 (don’t mix). Mobile consumes same tokens.
+* **DNS/Hosting:**
+
+  * DNS on **Route 53**
+  * Admin on **Vercel** with **wildcard subdomains**
+
+    * Records: `A (ALIAS)` apex → Vercel, `CNAME` `www` → Vercel, `CNAME` `*` → Vercel
+    * Add `example.com` and `*.example.com` inside Vercel → Domains
+  * API on AWS (EC2/App Runner/ECS Fargate). Domain: `api.example.com` via Route 53 → ALB/App Runner.
+* **Quality/Observability:** ESLint + Prettier (or Biome), Jest/Vitest; Husky + lint-staged; Sentry (web/mobile/backend); Pino logs (backend → CloudWatch).
+
+---
+
+## Global Conventions
+
+1. **TypeScript everywhere.** Strict mode on.
+2. **Paths/aliases:** Keep `@shared/*` for `packages/shared`. Ensure Metro + TS + Jest all resolve aliases.
+3. **Env management:** No secrets in code. Use Vercel env, Expo secrets, AWS SSM Parameter Store.
+4. **CI first:** Lint, typecheck, test must pass before build or deploy.
+5. **Accessibility:** For web, follow a11y best practices. For mobile, avoid hardcoded sizes, support Dynamic Type.
+6. **Security:**
+
+   * Backend validation with `class-validator`/`class-transformer`. Optionally Zod for shared runtime validation.
+   * CORS: allow Vercel domains + wildcard subdomains only.
+   * Use signed URLs for S3; never expose bucket directly.
+
+---
+
+## Do & Don’t (AI guardrails)
+
+* ✅ Do keep **Yarn workspaces** structure and Turbo pipelines intact.
+* ✅ Do place shared code in `packages/shared` and make it platform‑safe (no Node APIs in RN code).
+* ✅ Do add migrations for any DB schema change (TypeORM). Commit SQL or TS migration files.
+* ✅ Do configure Metro to watch and transpile workspace packages when touching mobile.
+* ❌ Don’t switch DB library (stay on TypeORM unless explicitly asked).
+* ❌ Don’t enable Yarn PnP. Keep `nodeLinker: node-modules`.
+* ❌ Don’t break SSR/ISR assumptions in Next.js (avoid `next export`).
+* ❌ Don’t add incompatible RN libs that require custom native code without EAS config updates.
+
+---
+
+## Scripts & Pipelines (expected)
+
+**Root**
+
+* `turbo run build` → builds all apps/packages
+* `turbo run dev` → local dev for selected apps
+* `turbo run lint` / `typecheck` / `test`
+
+**Admin (Next.js)**
+
+* `dev`, `build`, `start`
+* Use Tailwind + shadcn/ui. If adding components, run shadcn generator within `apps/admin` only.
+
+**Mobile (Expo)**
+
+* `start` (Metro), `android`, `ios`
+* EAS: `eas build --platform ios|android`, `eas submit`
+* Metro must resolve workspace packages. Ensure `watchFolders` and `resolver` for symlinks.
+
+**API (NestJS)**
+
+* `start:dev` (ts-node), `build` (tsc), `start:prod` (node dist)
+* **Migrations**: `typeorm migration:generate`, `typeorm migration:run` in CI before deploy
+* Docker: produce image tagged by SHA; push to registry for EC2/App Runner/ECS
+
+---
+
+## File/Config Rules
+
+* **.yarnrc.yml**: must contain `nodeLinker: node-modules`.
+* **tsconfig.base.json**: define `paths` for `@shared/*` → `packages/shared/*`.
+* **Babel/Metro (mobile)**: transpile `packages/shared` and any local packages; use `expo/metro-config` helpers.
+* **next.config.ts**: add custom image loader pointing to CloudFront asset domain.
+* **nestjs config**: use env‑driven config; `synchronize: false`; enable `ValidationPipe({ whitelist: true, transform: true })`.
+* **S3/CloudFront**: use signed URL utilities in backend; never build client‑side S3 creds.
+* **CORS**: restrict to Vercel domains and `*.example.com`; allow `api.example.com`.
+
+---
+
+## Environment Variables (baseline set)
+
+**Shared**
+
+* `NODE_ENV`
+* `SENTRY_DSN`
+
+**Admin (Vercel)**
+
+* `NEXTAUTH_URL` (or provider URLs if using Clerk/Auth0)
+* `NEXT_PUBLIC_CDN_URL` (CloudFront domain)
+* `API_BASE_URL` (points to `https://api.example.com`)
+
+**Mobile (Expo)**
+
+* `EXPO_PUBLIC_API_BASE_URL`
+* `EXPO_PUBLIC_CDN_URL`
+* Auth provider keys (secure via Expo secrets)
+
+**API (NestJS)**
+
+* `DATABASE_URL` (Neon pooled)
+* `REDIS_URL` (if used)
+* `S3_BUCKET`, `S3_REGION`, `CLOUDFRONT_URL`
+* `JWT_SECRET` / provider secrets
+
+---
+
+## Testing & Quality
+
+* **Lint:** ESLint + Prettier (or Biome). Fix before commit.
+* **Tests:** Jest/Vitest with TS config per package.
+* **Pre-commit:** Husky + lint-staged to run lint & typecheck on changed files.
+* **Errors:** Use Sentry in all apps. Add basic health checks in API.
+
+---
+
+## CI/CD Expectations (GitHub Actions)
+
+1. **Checks:** lint → typecheck → test → build (Turbo cache enabled)
+2. **Migrations:** run DB migrations before API deploy
+3. **Deploys:**
+
+   * Admin → Vercel
+   * Mobile → EAS (manual submit step OK)
+   * API → EC2/App Runner/ECS (Docker image)
+4. **Post‑deploy:** smoke tests for API and admin; report to Slack (optional)
+
+---
+
+## Domain & DNS (Route 53)
+
+* Hosted zone on Route 53
+* Records:
+
+  * Apex `A (ALIAS)` → Vercel target
+  * `www` `CNAME` → Vercel
+  * Wildcard `*` `CNAME` → Vercel
+  * `api` `A/ALIAS` → ALB/App Runner endpoint
+* Add both `example.com` and `*.example.com` in Vercel Domains.
+
+---
+
+## When adding features
+
+1. Place shared logic in `packages/shared`.
+2. Add types + Zod schema (if applicable) so both web/mobile/backend can validate.
+3. For storage needs, add backend handlers that mint signed S3 URLs; web/mobile upload directly to S3 via those URLs.
+4. For DB changes, create **TypeORM migration** and update entities. No breaking changes without migration.
+
+---
+
+## Definition of Done
+
+* Lint, typecheck, tests pass
+* Migrations created & run locally
+* Sentry breadcrumbs/errors wired (if touching new surface area)
+* Docs updated (README or app‑specific docs)
+
+---
+
+## Notes to Cursor
+
+* Prefer minimal diffs. Keep file order and formatting.
+* Before installing libs, check platform support (Next vs Expo vs Nest).
+* Offer code mods in **one app at a time** unless the change is cross‑cutting (e.g., shared types).
+* When confused about mobile bundling errors, check Metro cache & watchFolders first.
