@@ -24,10 +24,10 @@ These rules guide Cursor AI for this repo. Follow them strictly unless a task ex
 
 ## Tech Choices (Do not change)
 
-* **Web (Admin):** Next.js + Tailwind CSS + shadcn/ui
+* **Web (Admin):** Next.js + CSS framework + shadcn/ui
 * **Mobile:** React Native (Expo)
 
-  * Styling: **NativeWind** (Tailwind for RN) or **Tamagui** (if cross‑platform UI is needed)
+  * Styling: **NativeWind** (framework for RN) or **Tamagui** (if cross‑platform UI is needed)
 * **Backend:** NestJS + **TypeORM** (migrations required; no `synchronize` in prod)
 * **Database:** PostgreSQL (Neon). Use pooled connection string; region close to backend.
 * **Storage/CDN:** S3 for uploads/static; CloudFront in front of S3; use signed URLs.

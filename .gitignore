@@ -31,6 +31,11 @@ yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
 
+# API Logs
+apps/api/*.log
+apps/api/backend.log
+apps/api/api.log
+
 # Runtime data
 pids
 *.pid
