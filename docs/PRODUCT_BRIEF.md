@@ -2,7 +2,7 @@
 
 ## 1. Project Overview / Description
 
-Club Corra is a mobile loyalty and rewards application that enables users to earn and redeem "Corra Coins" through brand partnerships. The app operates on a bill-upload verification model where users upload purchase receipts to earn coins or redeem existing coins against future purchases. The system includes an admin portal for request verification and brand management, ensuring quality control and fraud prevention.
+Club Corra is a mobile loyalty and rewards application built as a monorepo using Yarn Workspaces + Turborepo. The system enables users to earn and redeem "Corra Coins" through brand partnerships using a bill-upload verification model. The architecture consists of three main applications: mobile app (Expo), admin portal (Next.js), and backend API (NestJS), all sharing common types and utilities.
 
 ## 2. Target Audience
 
@@ -13,7 +13,7 @@ Club Corra is a mobile loyalty and rewards application that enables users to ear
 ## 3. Primary Benefits / Features
 
 ### User Features
-- **Signup & Authentication**: Mobile number + OTP or OAuth 2.0, with UPI/payment details collection
+- **Signup & Authentication**: Mobile number with OTP(required) --> email OTP or OAuth 2.0(any one), with UPI ID details collection
 - **Welcome Bonus**: 100 Corra Coins upon account creation
 - **Brand Discovery**: Browse partner brands with earning/redeeming capabilities
 - **Earn Coins**: Upload bill images to earn brand-specific percentage of MRP
@@ -22,6 +22,7 @@ Club Corra is a mobile loyalty and rewards application that enables users to ear
 - **Suggestions**: Submit brand and category recommendations
 
 ### Admin Features
+- **Signup & Authentication**: Using @clubcorra.com domain only
 - **Request Verification**: Review pending earn/redeem requests with receipt validation
 - **Manual Payment Processing**: Process approved redemption payments
 - **Brand Management**: Add/edit/remove brands with earning/redeeming rules
@@ -35,15 +36,20 @@ Club Corra is a mobile loyalty and rewards application that enables users to ear
 
 ## 4. High-Level Tech/Architecture
 
+### Monorepo Structure
+- **Package Manager**: Yarn Berry with node_modules linker
+- **Build System**: Turborepo for efficient builds and caching
+- **Shared Package**: Common TypeScript types, Zod schemas, and utilities
+
 ### Mobile App
 - **Platform**: React Native (Expo) for cross-platform compatibility
-- **UI Framework**: NativeWind (Tailwind CSS for React Native)
+- **UI Framework**: (go through the current codebase and what is implemented) (CSS framework for React Native as tailwind was might not be stable with the current techstack)
 - **State Management**: React Context or Redux for app state
 - **Image Handling**: Camera integration and file upload capabilities
 
 ### Backend System
-- **Framework**: NestJS with TypeScript
-- **Database**: PostgreSQL with TypeORM for data persistence
+- **Framework**: NestJS with TypeScript and TypeORM
+- **Database**: PostgreSQL (Neon) with connection pooling
 - **Authentication**: JWT-based auth with OAuth 2.0 support
 - **File Storage**: S3-compatible storage for receipt images
 - **Image Processing**: Receipt OCR and validation services

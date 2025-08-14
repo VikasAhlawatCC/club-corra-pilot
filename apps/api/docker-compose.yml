@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: club_corra_postgres
+    environment:
+      POSTGRES_DB: club_corra_db
+      POSTGRES_USER: club_corra_user
+      POSTGRES_PASSWORD: club_corra_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U club_corra_user -d club_corra_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: club_corra_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    container_name: club_corra_api
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://neondb_owner:npg_e91RZvdAtrYG@ep-old-firefly-a1o93p6l-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+      REDIS_URL: redis://default:AT2GAAIjcDFjOTkzMzcxMjYxMzU0YzMzYWZjOTI2ZGZmODE0MWMyYnAxMA@next-blowfish-15750.upstash.io:6379
+      JWT_SECRET: 50b7a8cc31ec6572a3d2b5a859b80749a0fa077e6cddf9315498b037cf6f97b670ce28b03cb6a26319856e9f49ca2729a99812171c2ff2605407a0d537712b58
+      JWT_REFRESH_SECRET: 8b0a86f6d5dfd1c9f1273f74b6624531e19c4635c890b4e97c14b216eae67cf63cf2552147e486dd65f0aed44d637ca5bfe31799c5dae9631cf7c72c87c01920
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN}
+      TWILIO_PHONE_NUMBER: ${TWILIO_PHONE_NUMBER}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_SECURE: ${SMTP_SECURE}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL}
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - /app/node_modules
+    command: yarn start:dev
+
+volumes:
+  postgres_data:
+  redis_data:
