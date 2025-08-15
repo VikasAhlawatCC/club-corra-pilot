@@ -129,7 +129,8 @@ export interface JwtPayload {
   sub: string; // user ID
   mobileNumber: string;
   email?: string;
-  roles: string[];
+  roles?: string[]; // For regular users
+  role?: 'ADMIN' | 'SUPER_ADMIN'; // For admin users
   iat: number;
   exp: number;
 }

@@ -8,3 +8,8 @@ export { WelcomeBonusPopup } from './WelcomeBonusPopup';
 export { LoadingSpinner } from './LoadingSpinner';
 export { SuccessAnimation } from './SuccessAnimation';
 export { ErrorAnimation } from './ErrorAnimation';
+export { WelcomeBonusAnimation } from './WelcomeBonusAnimation';
+export { WelcomeBonusDemo } from './WelcomeBonusDemo';
+export { default as FileUpload } from './FileUpload';
+export { default as DatePicker } from './DatePicker';
+export { default as Slider } from './Slider';

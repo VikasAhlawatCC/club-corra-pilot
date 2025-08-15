@@ -10,6 +10,8 @@ import { CreateRedeemRequestDto } from './dto/create-redeem-request.dto';
 import { WelcomeBonusDto } from './dto/welcome-bonus.dto';
 import { WebsocketModule } from '../websocket/websocket.module';
 import { ConnectionManager } from '../websocket/connection.manager';
+import { TransactionApprovalService } from './services/transaction-approval.service';
+import { PaymentProcessingService } from './services/payment-processing.service';
 
 @Injectable()
 export class CoinsService {
@@ -23,6 +25,8 @@ export class CoinsService {
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     private readonly connectionManager: ConnectionManager,
+    private readonly transactionApprovalService: TransactionApprovalService,
+    private readonly paymentProcessingService: PaymentProcessingService,
   ) {}
 
   async createEarnRequest(userId: string, createEarnRequestDto: CreateEarnRequestDto): Promise<CoinTransaction> {
@@ -218,5 +222,225 @@ export class CoinsService {
       limit,
       totalPages: Math.ceil(total / limit),
     };
+  }
+
+  // Admin approval methods
+  async approveEarnTransaction(
+    transactionId: string,
+    adminUserId: string,
+    adminNotes?: string,
+  ): Promise<CoinTransaction> {
+    const transaction = await this.transactionApprovalService.approveEarnTransaction(
+      transactionId,
+      adminUserId,
+      adminNotes,
+    );
+
+    // Send real-time balance update
+    const userBalance = await this.getUserBalance(transaction.userId);
+    await this.connectionManager.sendRealTimeBalanceUpdate(
+      transaction.userId,
+      userBalance.balance,
+      transaction.id,
+      'EARN',
+      'APPROVED',
+    );
+
+    // Send transaction approval notification
+    await this.connectionManager.sendTransactionApprovalNotification(
+      transaction.userId,
+      transaction.id,
+      'EARN',
+      'APPROVED',
+      adminNotes,
+    );
+
+    return transaction;
+  }
+
+  async rejectEarnTransaction(
+    transactionId: string,
+    adminUserId: string,
+    adminNotes: string,
+  ): Promise<CoinTransaction> {
+    const transaction = await this.transactionApprovalService.rejectEarnTransaction(
+      transactionId,
+      adminUserId,
+      adminNotes,
+    );
+
+    // Send transaction rejection notification
+    await this.connectionManager.sendTransactionApprovalNotification(
+      transaction.userId,
+      transaction.id,
+      'EARN',
+      'REJECTED',
+      adminNotes,
+    );
+
+    return transaction;
+  }
+
+  async approveRedeemTransaction(
+    transactionId: string,
+    adminUserId: string,
+    adminNotes?: string,
+  ): Promise<CoinTransaction> {
+    const transaction = await this.transactionApprovalService.approveRedeemTransaction(
+      transactionId,
+      adminUserId,
+      adminNotes,
+    );
+
+    // Send real-time balance update
+    const userBalance = await this.getUserBalance(transaction.userId);
+    await this.connectionManager.sendRealTimeBalanceUpdate(
+      transaction.userId,
+      userBalance.balance,
+      transaction.id,
+      'REDEEM',
+      'PROCESSED',
+    );
+
+    // Send transaction approval notification
+    await this.connectionManager.sendTransactionApprovalNotification(
+      transaction.userId,
+      transaction.id,
+      'REDEEM',
+      'PROCESSED',
+      adminNotes,
+    );
+
+    return transaction;
+  }
+
+  async rejectRedeemTransaction(
+    transactionId: string,
+    adminUserId: string,
+    adminNotes: string,
+  ): Promise<CoinTransaction> {
+    const transaction = await this.transactionApprovalService.rejectRedeemTransaction(
+      transactionId,
+      adminUserId,
+      adminNotes,
+    );
+
+    // Send transaction rejection notification
+    await this.connectionManager.sendTransactionApprovalNotification(
+      transaction.userId,
+      transaction.id,
+      'REDEEM',
+      'REJECTED',
+      adminNotes,
+    );
+
+    return transaction;
+  }
+
+  async processPayment(
+    transactionId: string,
+    adminUserId: string,
+    paymentTransactionId: string,
+    paymentMethod: string,
+    paymentAmount: number,
+    adminNotes?: string,
+  ): Promise<CoinTransaction> {
+    const transaction = await this.paymentProcessingService.processPayment({
+      transactionId,
+      adminUserId,
+      paymentTransactionId,
+      paymentMethod,
+      paymentAmount,
+      adminNotes,
+    });
+
+    // Send real-time balance update
+    const userBalance = await this.getUserBalance(transaction.userId);
+    await this.connectionManager.sendRealTimeBalanceUpdate(
+      transaction.userId,
+      userBalance.balance,
+      transaction.id,
+      'REDEEM',
+      'PAID',
+    );
+
+    // Send transaction approval notification
+    await this.connectionManager.sendTransactionApprovalNotification(
+      transaction.userId,
+      transaction.id,
+      'REDEEM',
+      'PAID',
+      adminNotes,
+    );
+
+    return transaction;
+  }
+
+  // Admin query methods
+  async getPendingTransactions(page: number = 1, limit: number = 20, type?: 'EARN' | 'REDEEM') {
+    return await this.transactionApprovalService.getPendingTransactions(page, limit, type);
+  }
+
+  async getTransactionStats() {
+    return await this.transactionApprovalService.getTransactionStats();
+  }
+
+  async getPaymentStats(startDate?: Date, endDate?: Date) {
+    return await this.paymentProcessingService.getPaymentStats(startDate, endDate);
+  }
+
+  async getPaymentSummary(transactionId: string) {
+    return await this.paymentProcessingService.getPaymentSummary(transactionId);
+  }
+
+  // Additional admin methods
+  async getAllTransactions(page: number = 1, limit: number = 20, userId?: string) {
+    const skip = (page - 1) * limit;
+    const whereClause: any = {};
+    
+    if (userId) {
+      whereClause.userId = userId;
+    }
+
+    const [transactions, total] = await this.transactionRepository.findAndCount({
+      where: whereClause,
+      relations: ['brand', 'user'],
+      order: { createdAt: 'DESC' },
+      skip,
+      take: limit,
+    });
+
+    return {
+      data: transactions,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  async getUserTransactions(userId: string, page: number = 1, limit: number = 20) {
+    return this.getTransactionHistory(userId, page, limit);
+  }
+
+  async getUserTransactionSummary(userId: string) {
+    const balance = await this.getUserBalance(userId);
+    const [transactions] = await this.transactionRepository.findAndCount({
+      where: { userId },
+      select: ['type', 'amount', 'status', 'createdAt'],
+    });
+
+    const summary = {
+      userId,
+      currentBalance: balance.balance,
+      totalEarned: balance.totalEarned,
+      totalRedeemed: balance.totalRedeemed,
+      totalTransactions: transactions.length,
+      pendingTransactions: transactions.filter(t => t.status === 'PENDING').length,
+      approvedTransactions: transactions.filter(t => t.status === 'APPROVED').length,
+      rejectedTransactions: transactions.filter(t => t.status === 'REJECTED').length,
+    };
+
+    return summary;
   }
 }

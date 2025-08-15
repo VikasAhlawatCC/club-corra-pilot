@@ -1,9 +1,9 @@
-import { IsString, IsEmail, IsOptional, IsEnum, IsDateString, IsMobilePhone, MinLength, MaxLength, IsIn, IsNotEmpty } from 'class-validator';
+import { IsString, IsEmail, IsOptional, IsEnum, IsDateString, Matches, MinLength, MaxLength, IsIn, IsNotEmpty } from 'class-validator';
 import { ProviderType } from '../../users/entities/auth-provider.entity';
 
 export class SignupDto {
   @IsString()
-  @IsMobilePhone('en-IN', {}, { message: 'Please provide a valid Indian mobile number' })
+  @Matches(/^(\+91[0-9]{10}|[0-9]{10})$/, { message: 'Please provide a valid Indian mobile number (10 digits with or without +91 country code)' })
   @IsNotEmpty({ message: 'Mobile number is required' })
   mobileNumber: string;
 
@@ -43,7 +43,7 @@ export class SignupDto {
 
 export class OAuthSignupDto {
   @IsString()
-  @IsMobilePhone('en-IN', {}, { message: 'Please provide a valid Indian mobile number' })
+  @Matches(/^(\+91[0-9]{10}|[0-9]{10})$/, { message: 'Please provide a valid Indian mobile number (10 digits with or without +91 country code)' })
   @IsNotEmpty({ message: 'Mobile number is required' })
   mobileNumber: string;
 
@@ -91,14 +91,14 @@ export class InitialSignupDto {
   lastName: string;
 
   @IsString()
-  @IsMobilePhone('en-IN', {}, { message: 'Please provide a valid Indian mobile number' })
+  @Matches(/^(\+91[0-9]{10}|[0-9]{10})$/, { message: 'Please provide a valid Indian mobile number (10 digits with or without +91 country code)' })
   @IsNotEmpty({ message: 'Mobile number is required' })
   mobileNumber: string;
 }
 
 export class SignupOtpVerificationDto {
   @IsString()
-  @IsMobilePhone('en-IN', {}, { message: 'Please provide a valid Indian mobile number' })
+  @Matches(/^(\+91[0-9]{10}|[0-9]{10})$/, { message: 'Please provide a valid Indian mobile number (10 digits with or without +91 country code)' })
   @IsNotEmpty({ message: 'Mobile number is required' })
   mobileNumber: string;
 
@@ -111,7 +111,7 @@ export class SignupOtpVerificationDto {
 
 export class SignupPasswordSetupDto {
   @IsString()
-  @IsMobilePhone('en-IN', {}, { message: 'Please provide a valid Indian mobile number' })
+  @Matches(/^(\+91[0-9]{10}|[0-9]{10})$/, { message: 'Please provide a valid Indian mobile number (10 digits with or without +91 country code)' })
   @IsNotEmpty({ message: 'Mobile number is required' })
   mobileNumber: string;
 
@@ -127,7 +127,7 @@ export class SignupPasswordSetupDto {
 
 export class SignupEmailVerificationDto {
   @IsString()
-  @IsMobilePhone('en-IN', {}, { message: 'Please provide a valid Indian mobile number' })
+  @Matches(/^(\+91[0-9]{10}|[0-9]{10})$/, { message: 'Please provide a valid Indian mobile number (10 digits with or without +91 country code)' })
   @IsNotEmpty({ message: 'Mobile number is required' })
   mobileNumber: string;
 

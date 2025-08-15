@@ -32,12 +32,13 @@ async function bootstrap() {
   const allowedOrigins = configService.get<string>('ALLOWED_ORIGINS')?.split(',') || [
     'http://localhost:3000',
     'http://localhost:3001',
-    'http://192.168.1.5:3000',
-    'http://192.168.1.5:3001',
-    'exp://192.168.1.5:8081',
+    // Development environment - allow local network access
+    /^http:\/\/192\.168\.\d+\.\d+:\d+$/,
+    /^exp:\/\/192\.168\.\d+\.\d+:\d+$/,
     'exp://localhost:8081',
     'exp://127.0.0.1:8081',
     'exp+club-corra-pilot://expo-development-client',
+    // Production domains (when deployed)
     'https://admin.clubcorra.com',
     'https://*.clubcorra.com',
   ];
@@ -52,6 +53,13 @@ async function bootstrap() {
           origin.startsWith('exp://') || 
           origin.startsWith('exp+')) {
         return callback(null, true);
+      }
+      
+      // Check regex patterns for local network access
+      for (const pattern of allowedOrigins) {
+        if (pattern instanceof RegExp && pattern.test(origin)) {
+          return callback(null, true);
+        }
       }
       
       // For development, allow all localhost and expo origins
@@ -87,11 +95,14 @@ async function bootstrap() {
   });
 
   const port = configService.get<number>('PORT') || 3001;
-  await app.listen(port);
+  const host = configService.get<string>('HOST') || '0.0.0.0';
+  
+  await app.listen(port, host);
 
-  logger.log(`🚀 Application is running on: http://localhost:${port}`);
-  logger.log(`📚 API Documentation available at: http://localhost:${port}/api/v1/docs`);
-  logger.log(`🔍 Health check available at: http://localhost:${port}/api/v1/health`);
+  logger.log(`🚀 Application is running on: http://${host}:${port}`);
+  logger.log(`🌐 Network accessible at: http://192.168.1.4:${port}`);
+  logger.log(`📚 API Documentation available at: http://${host}:${port}/api/v1/docs`);
+  logger.log(`🔍 Health check available at: http://${host}:${port}/api/v1/health`);
 }
 
 bootstrap().catch((error) => {

@@ -6,6 +6,7 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { BrandsModule } from './brands/brands.module';
 import { CoinsModule } from './coins/coins.module';
+import { AdminModule } from './admin/admin.module';
 import { ConfigModule } from './config/config.module';
 import { FileModule } from './files/file.module';
 import { NotificationModule } from './notifications/notification.module';
@@ -28,6 +29,7 @@ import { TypeOrmConfig } from './config/typeorm.config';
     UsersModule,
     BrandsModule,
     CoinsModule,
+    AdminModule,
     ConfigModule,
     FileModule,
     NotificationModule,

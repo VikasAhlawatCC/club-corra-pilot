@@ -11,6 +11,16 @@ export class MobileLoginDto {
   otpCode: string;
 }
 
+export class MobilePasswordLoginDto {
+  @IsString()
+  @IsNotEmpty({ message: 'Mobile number is required' })
+  mobileNumber: string;
+
+  @IsString()
+  @IsNotEmpty({ message: 'Password is required' })
+  password: string;
+}
+
 export class EmailLoginDto {
   @IsEmail({}, { message: 'Please provide a valid email address' })
   @IsNotEmpty({ message: 'Email is required' })

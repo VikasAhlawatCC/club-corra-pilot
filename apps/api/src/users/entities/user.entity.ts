@@ -67,6 +67,9 @@ export class User {
   @Column({ type: 'timestamp', nullable: true })
   lastLoginAt: Date;
 
+  @Column('simple-array', { default: 'USER' })
+  roles: string[];
+
   @CreateDateColumn()
   createdAt: Date;
 

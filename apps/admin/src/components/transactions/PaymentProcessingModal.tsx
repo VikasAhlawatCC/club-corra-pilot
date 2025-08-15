@@ -8,7 +8,13 @@ interface PaymentProcessingModalProps {
   transaction: CoinTransaction | null
   isOpen: boolean
   onClose: () => void
-  onProcessPayment: (transactionId: string, adminTransactionId: string, adminNotes?: string) => void
+  onProcessPayment: (
+    transactionId: string, 
+    paymentTransactionId: string, 
+    paymentMethod: string, 
+    paymentAmount: number, 
+    adminNotes?: string
+  ) => void
   isLoading?: boolean
 }
 
@@ -49,7 +55,7 @@ export function PaymentProcessingModal({
     
     if (!validateForm()) return
 
-    onProcessPayment(transaction.id, adminTransactionId.trim(), adminNotes.trim() || undefined)
+    onProcessPayment(transaction.id, adminTransactionId.trim(), 'MANUAL', 0, adminNotes.trim() || undefined)
     
     // Reset form
     setAdminTransactionId('')

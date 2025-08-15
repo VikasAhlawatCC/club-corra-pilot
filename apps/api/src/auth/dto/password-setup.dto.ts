@@ -1,7 +1,7 @@
-import { IsString, MinLength, Matches, IsNotEmpty, IsMobilePhone } from 'class-validator';
+import { IsString, MinLength, Matches, IsNotEmpty } from 'class-validator';
 
 export class PasswordSetupDto {
-  @IsMobilePhone()
+  @Matches(/^(\+91[0-9]{10}|[0-9]{10})$/, { message: 'Please provide a valid Indian mobile number (10 digits with or without +91 country code)' })
   @IsNotEmpty({ message: 'Mobile number is required' })
   mobileNumber: string;
 

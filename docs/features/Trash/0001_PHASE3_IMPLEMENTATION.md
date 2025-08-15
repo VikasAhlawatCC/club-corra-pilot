@@ -204,7 +204,7 @@ JWT_SECRET=your-jwt-secret
 JWT_REFRESH_SECRET=your-refresh-secret
 
 # Mobile
-EXPO_PUBLIC_API_BASE_URL=http://192.168.1.5:3001
+EXPO_PUBLIC_API_BASE_URL=http://192.168.1.4:3001
 ```
 
 ### Headers

@@ -130,15 +130,9 @@ export function BrandTable({ brands, onEdit, onDelete, onView }: BrandTableProps
                 {brand.redemptionPercentage}%
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                <div className="space-y-1">
-                  <div className="text-xs">
-                    <span className="text-gray-500">Overall: </span>
-                    <span className="font-medium">₹{brand.overallMaxCap}</span>
-                  </div>
-                  <div className="text-xs">
-                    <span className="text-gray-500">Per Tx: </span>
-                    <span className="font-medium">₹{brand.brandwiseMaxCap}</span>
-                  </div>
+                <div className="text-xs">
+                  <span className="text-gray-500">Max Per Tx: </span>
+                  <span className="font-medium">₹{brand.brandwiseMaxCap}</span>
                 </div>
               </td>
               <td className="px-6 py-4 whitespace-nowrap">

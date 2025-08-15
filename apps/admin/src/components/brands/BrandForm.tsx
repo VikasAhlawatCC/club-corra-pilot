@@ -28,9 +28,8 @@ export function BrandForm({
     categoryId: '',
     earningPercentage: 30,
     redemptionPercentage: 100,
-    minRedemptionAmount: undefined,
-    maxRedemptionAmount: undefined,
-    overallMaxCap: 2000,
+    minRedemptionAmount: 1,
+    maxRedemptionAmount: 2000,
     brandwiseMaxCap: 2000,
   })
 
@@ -47,7 +46,7 @@ export function BrandForm({
         redemptionPercentage: brand.redemptionPercentage,
         minRedemptionAmount: brand.minRedemptionAmount,
         maxRedemptionAmount: brand.maxRedemptionAmount,
-        overallMaxCap: brand.overallMaxCap,
+
         brandwiseMaxCap: brand.brandwiseMaxCap,
       })
     } else {
@@ -58,9 +57,8 @@ export function BrandForm({
         categoryId: '',
         earningPercentage: 30,
         redemptionPercentage: 100,
-        minRedemptionAmount: undefined,
-        maxRedemptionAmount: undefined,
-        overallMaxCap: 2000,
+        minRedemptionAmount: 1,
+        maxRedemptionAmount: 2000,
         brandwiseMaxCap: 2000,
       })
     }
@@ -110,9 +108,6 @@ export function BrandForm({
     }
 
     // Cap validation
-    if (formData.overallMaxCap < 0) {
-      newErrors.overallMaxCap = 'Overall max cap must be non-negative'
-    }
 
     if (formData.brandwiseMaxCap < 0) {
       newErrors.brandwiseMaxCap = 'Brandwise max cap must be non-negative'
@@ -145,8 +140,6 @@ export function BrandForm({
     
     // Clean up undefined values
     if (submitData.logoUrl === '') submitData.logoUrl = undefined
-    if (submitData.minRedemptionAmount === undefined) delete submitData.minRedemptionAmount
-    if (submitData.maxRedemptionAmount === undefined) delete submitData.maxRedemptionAmount
 
     onSubmit(submitData)
   }
@@ -159,9 +152,9 @@ export function BrandForm({
       categoryId: '',
       earningPercentage: 30,
       redemptionPercentage: 100,
-      minRedemptionAmount: undefined,
-      maxRedemptionAmount: undefined,
-      overallMaxCap: 2000,
+      minRedemptionAmount: 1,
+      maxRedemptionAmount: 2000,
+      
       brandwiseMaxCap: 2000,
     })
     setErrors({})
@@ -413,34 +406,7 @@ export function BrandForm({
           {/* Cap Configuration */}
           <div className="bg-gray-50 p-4 rounded-lg">
             <h4 className="text-lg font-semibold text-gray-900 mb-4">Cap Configuration</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label htmlFor="overallMaxCap" className="block text-sm font-medium text-gray-700 mb-2">
-                  Overall Max Cap *
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3 top-2 text-gray-500">₹</span>
-                  <input
-                    type="number"
-                    id="overallMaxCap"
-                    value={formData.overallMaxCap}
-                    onChange={(e) => handleInputChange('overallMaxCap', parseFloat(e.target.value) || 0)}
-                    className={`w-full px-3 py-2 pl-8 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
-                      errors.overallMaxCap ? 'border-red-300' : 'border-gray-300'
-                    }`}
-                    min="0"
-                    step="0.01"
-                    required
-                  />
-                </div>
-                {errors.overallMaxCap && (
-                  <p className="mt-1 text-sm text-red-600">{errors.overallMaxCap}</p>
-                )}
-                <p className="mt-1 text-xs text-gray-500">
-                  Maximum total redemption amount across all users for this brand
-                </p>
-              </div>
-
+            <div className="grid grid-cols-1 md:grid-cols-1 gap-6">
               <div>
                 <label htmlFor="brandwiseMaxCap" className="block text-sm font-medium text-gray-700 mb-2">
                   Brandwise Max Cap *

@@ -1,295 +1,103 @@
-# Club Corra API
+# Club Corra API Server
 
-This is the NestJS backend API for the Club Corra application, implementing comprehensive user authentication and management.
-
-## Features
-
-- **User Authentication**: Mobile number + OTP verification, email verification, OAuth 2.0 support
-- **User Management**: Profile management, payment details, account status
-- **OTP System**: Secure OTP generation and verification for mobile and email
-- **SMS Integration**: Twilio integration for OTP delivery
-- **Email Integration**: SMTP integration for OTP and notifications
-- **JWT Authentication**: Secure token-based authentication with refresh tokens
-- **Database**: PostgreSQL with TypeORM, proper migrations
-
-## Prerequisites
-
-- Node.js 18+ 
-- PostgreSQL 12+
-- Yarn package manager
-
-## Installation
-
-1. Install dependencies:
-```bash
-yarn install
-```
-
-2. Copy environment variables:
-```bash
-cp .env.example .env
-```
-
-3. Configure your environment variables (see Environment Variables section)
-
-4. Run database migrations:
-```bash
-yarn migration:run
-```
-
-5. Start the development server:
-```bash
-yarn start:dev
-```
-
-## Environment Variables
+## Environment Configuration
 
 Create a `.env` file in the `apps/api` directory with the following variables:
 
-### Database Configuration
-```
-DATABASE_URL=postgresql://username:password@localhost:5432/club_corra_db
-```
+```bash
+# Server Configuration
+PORT=3001
+NODE_ENV=development
 
-### JWT Configuration
-```
+# Database Configuration
+DATABASE_URL=postgresql://username:password@localhost:5432/clubcorra
+REDIS_URL=redis://localhost:6379
+
+# JWT Configuration
 JWT_SECRET=your-super-secret-jwt-key-here
-JWT_REFRESH_SECRET=your-super-secret-refresh-key-here
-```
+JWT_EXPIRES_IN=7d
 
-### Twilio SMS Configuration
-```
-TWILIO_ACCOUNT_SID=your_twilio_account_sid
-TWILIO_AUTH_TOKEN=your_twilio_auth_token
+# CORS Configuration
+ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001,exp://localhost:8081
+
+# S3 Configuration (for file uploads)
+S3_BUCKET=clubcorra-uploads
+S3_REGION=us-east-1
+S3_ACCESS_KEY_ID=your-access-key
+S3_SECRET_ACCESS_KEY=your-secret-key
+CLOUDFRONT_URL=https://cdn.clubcorra.com
+
+# Sentry Configuration (for error monitoring)
+SENTRY_DSN=
+
+# Email Configuration (for notifications)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your-email@gmail.com
+SMTP_PASS=your-app-password
+
+# SMS Configuration (for OTP)
+TWILIO_ACCOUNT_SID=your-account-sid
+TWILIO_AUTH_TOKEN=your-auth-token
 TWILIO_PHONE_NUMBER=+1234567890
 ```
 
-### SMTP Email Configuration
-```
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_SECURE=false
-SMTP_USER=your_email@gmail.com
-SMTP_PASS=your_app_password
-SMTP_FROM_EMAIL=noreply@clubcorra.com
-```
+## Development Setup
 
-### OAuth Configuration
-```
-GOOGLE_CLIENT_ID=your_google_client_id
-GOOGLE_CLIENT_SECRET=your_google_client_secret
-FACEBOOK_APP_ID=your_facebook_app_id
-FACEBOOK_APP_SECRET=your_facebook_app_secret
-```
+1. Install dependencies:
+   ```bash
+   yarn install
+   ```
 
-### Application Configuration
-```
-NODE_ENV=development
-PORT=3001
-```
+2. Set up the database:
+   ```bash
+   # Create database
+   createdb clubcorra
+   
+   # Run migrations
+   yarn migration:run
+   ```
+
+3. Start the development server:
+   ```bash
+   yarn start:dev
+   ```
+
+## WebSocket Configuration
+
+The API server includes a WebSocket gateway for real-time updates:
+
+- **Path**: `/socket.io`
+- **CORS**: Configured to allow mobile app connections
+- **Events**: Supports ping/pong, user registration, and real-time updates
 
 ## API Endpoints
 
-### Authentication
+- **Health Check**: `GET /api/v1/health`
+- **Authentication**: `POST /api/v1/auth/*`
+- **Users**: `GET/POST/PUT/DELETE /api/v1/users/*`
+- **Brands**: `GET/POST/PUT/DELETE /api/v1/brands/*`
+- **Coins**: `GET/POST/PUT/DELETE /api/v1/coins/*`
 
-#### User Signup
-```
-POST /api/v1/auth/signup
-```
+## Troubleshooting
 
-**Request Body:**
-```json
-{
-  "mobileNumber": "+1234567890",
-  "email": "user@example.com",
-  "firstName": "John",
-  "lastName": "Doe",
-  "dateOfBirth": "1990-01-01",
-  "gender": "male"
-}
-```
+### WebSocket Connection Issues
 
-#### OAuth Signup
-```
-POST /api/v1/auth/oauth/signup
-```
+If the mobile app can't connect to WebSocket:
 
-**Request Body:**
-```json
-{
-  "mobileNumber": "+1234567890",
-  "oauthProvider": "google",
-  "oauthToken": "google_access_token",
-  "firstName": "John",
-  "lastName": "Doe"
-}
-```
+1. **Check if server is running**: Ensure `yarn start:dev` is running
+2. **Check CORS configuration**: Verify allowed origins in `.env`
+3. **Check network access**: Ensure mobile device can reach the server IP
+4. **Check firewall**: Ensure port 3001 is accessible
 
-#### Request OTP
-```
-POST /api/v1/auth/request-otp
-```
+### Database Connection Issues
 
-**Request Body:**
-```json
-{
-  "mobileNumber": "+1234567890",
-  "type": "mobile"
-}
-```
+1. **Check PostgreSQL**: Ensure database is running and accessible
+2. **Check connection string**: Verify DATABASE_URL format
+3. **Run migrations**: Ensure database schema is up to date
 
-#### Verify OTP
-```
-POST /api/v1/auth/verify-otp
-```
+### CORS Issues
 
-**Request Body:**
-```json
-{
-  "mobileNumber": "+1234567890",
-  "code": "123456",
-  "type": "mobile"
-}
-```
-
-#### Mobile Login
-```
-POST /api/v1/auth/login/mobile
-```
-
-**Request Body:**
-```json
-{
-  "mobileNumber": "+1234567890",
-  "otpCode": "123456"
-}
-```
-
-#### Refresh Token
-```
-POST /api/v1/auth/refresh-token
-```
-
-**Request Body:**
-```json
-{
-  "refreshToken": "your_refresh_token"
-}
-```
-
-### User Management
-
-#### Get Profile
-```
-GET /api/v1/users/profile
-Authorization: Bearer <access_token>
-```
-
-#### Update Profile
-```
-PUT /api/v1/users/profile
-Authorization: Bearer <access_token>
-```
-
-**Request Body:**
-```json
-{
-  "firstName": "John",
-  "lastName": "Doe",
-  "dateOfBirth": "1990-01-01",
-  "gender": "male"
-}
-```
-
-#### Update Payment Details
-```
-PUT /api/v1/users/payment-details
-Authorization: Bearer <access_token>
-```
-
-**Request Body:**
-```json
-{
-  "upiId": "user@upi",
-  "preferredMethod": "upi"
-}
-```
-
-## Database Schema
-
-The API uses the following main entities:
-
-- **users**: Core user information and authentication status
-- **user_profiles**: User profile details (name, DOB, address, etc.)
-- **payment_details**: Payment method preferences and UPI details
-- **auth_providers**: OAuth provider connections
-- **otps**: OTP codes for verification
-
-## Development
-
-### Running Migrations
-
-Generate a new migration:
-```bash
-yarn migration:generate -- -n MigrationName
-```
-
-Run migrations:
-```bash
-yarn migration:run
-```
-
-Revert last migration:
-```bash
-yarn migration:revert
-```
-
-### Testing
-
-Run tests:
-```bash
-yarn test
-```
-
-Run tests in watch mode:
-```bash
-yarn test:watch
-```
-
-### Building
-
-Build for production:
-```bash
-yarn build
-```
-
-Start production server:
-```bash
-yarn start:prod
-```
-
-## Security Features
-
-- OTP expiration and rate limiting
-- JWT token rotation with refresh tokens
-- Secure password hashing with bcrypt
-- Input validation and sanitization
-- CORS configuration for authorized domains
-- Rate limiting for authentication attempts
-
-## Integration Points
-
-- **SMS Service**: Twilio for OTP delivery
-- **Email Service**: SMTP for OTP and notifications
-- **OAuth Providers**: Google, Facebook, Apple
-- **Database**: PostgreSQL with TypeORM
-- **Authentication**: JWT with Passport.js
-
-## Notes
-
-- Mobile number verification is mandatory for all users
-- Email verification is required (either via OTP or OAuth)
-- OAuth users still need mobile number verification
-- Payment details are optional and can be completed later
-- All sensitive data is hashed before storage
-- JWT tokens have different expiration times for mobile vs web
+1. **Check allowed origins**: Verify ALLOWED_ORIGINS in `.env`
+2. **Check mobile app URL**: Ensure mobile app is using allowed origin
+3. **Restart server**: CORS changes require server restart

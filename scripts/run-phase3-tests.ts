@@ -1,4 +1,4 @@
-#!/usr/bin/env ts-node
+#!/usr/bin/env node
 
 import { execSync } from 'child_process';
 import { existsSync } from 'fs';
@@ -168,7 +168,7 @@ function runPerformanceTests(): boolean {
 function runSecurityTests(): boolean {
   log('\n🔒 Running Security Tests...', 'blue');
   
-  const securityTestPath = 'apps/api/src/__tests__/security';
+  const securityTestPath = 'apps/api/src/__tests__/integration';
   
   if (!existsSync(securityTestPath)) {
     log('❌ Security test directory not found', 'red');

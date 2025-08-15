@@ -67,7 +67,7 @@ EXPO_PUBLIC_GOOGLE_CLIENT_ID=your_actual_google_client_id_here
 EXPO_PUBLIC_GOOGLE_REDIRECT_URI=clubcorra://auth/callback
 
 # API Configuration
-EXPO_PUBLIC_API_BASE_URL=http://192.168.1.5:3001
+EXPO_PUBLIC_API_BASE_URL=http://192.168.1.4:3001
 ```
 
 ## Step 3: Expo Configuration

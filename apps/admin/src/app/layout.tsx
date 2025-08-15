@@ -3,6 +3,8 @@ import { Inter } from 'next/font/google'
 import './globals.css'
 import { AdminNavigation } from '@/components/layout/AdminNavigation'
 import { ErrorBoundary } from '@/components/common'
+import { AuthProvider } from '@/contexts/AuthContext'
+import { AuthGuard } from '@/components/auth/AuthGuard'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -20,12 +22,16 @@ export default function RootLayout({
     <html lang="en">
       <body className={inter.className}>
         <ErrorBoundary>
-          <div className="min-h-screen bg-background">
-            <AdminNavigation />
-            <main className="flex-1 p-6">
-              {children}
-            </main>
-          </div>
+          <AuthProvider>
+            <AuthGuard>
+              <div className="min-h-screen bg-background">
+                <AdminNavigation />
+                <main className="flex-1 p-6">
+                  {children}
+                </main>
+              </div>
+            </AuthGuard>
+          </AuthProvider>
         </ErrorBoundary>
       </body>
     </html>

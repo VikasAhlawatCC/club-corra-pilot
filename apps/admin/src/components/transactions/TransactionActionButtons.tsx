@@ -14,7 +14,13 @@ interface TransactionActionButtonsProps {
   transaction: CoinTransaction
   onApprove: (transactionId: string, adminNotes?: string) => void
   onReject: (transactionId: string, reason: string, adminNotes?: string) => void
-  onProcessPayment: (transactionId: string, adminTransactionId: string, adminNotes?: string) => void
+  onProcessPayment: (
+    transactionId: string, 
+    paymentTransactionId: string, 
+    paymentMethod: string, 
+    paymentAmount: number, 
+    adminNotes?: string
+  ) => void
   isLoading?: boolean
 }
 
@@ -62,7 +68,13 @@ export function TransactionActionButtons({
   const handleProcessPayment = () => {
     if (!paymentTransactionId.trim()) return
     
-    onProcessPayment(transaction.id, paymentTransactionId.trim(), adminNotes.trim() || undefined)
+    onProcessPayment(
+      transaction.id, 
+      paymentTransactionId.trim(), 
+      'bank_transfer', // Default payment method
+      transaction.amount, // Use transaction amount
+      adminNotes.trim() || undefined
+    )
     setShowPaymentModal(false)
     setPaymentTransactionId('')
     setAdminNotes('')

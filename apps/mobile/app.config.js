@@ -1,5 +1,36 @@
 const path = require('path');
-require('dotenv').config({ path: path.resolve(__dirname, '.env') });
+
+// Try to load .env file if it exists, but don't fail if it doesn't
+try {
+  require('dotenv').config({ path: path.resolve(__dirname, '.env') });
+} catch (error) {
+  console.log('No .env file found, using default values');
+}
+
+// Get environment variables with fallbacks
+const getEnvVar = (key, fallback) => {
+  return process.env[key] || fallback;
+};
+
+// Determine the base URL based on environment
+const getBaseUrl = () => {
+  if (process.env.NODE_ENV === 'production') {
+    return 'https://api.clubcorra.com';
+  }
+  
+  // Development - use environment variable or fallback to network IP
+  return getEnvVar('EXPO_PUBLIC_API_BASE_URL', 'http://192.168.1.4:3001');
+};
+
+// Get WebSocket URL (should be the base server URL, not the API endpoint)
+const getWsUrl = () => {
+  if (process.env.NODE_ENV === 'production') {
+    return 'https://api.clubcorra.com';
+  }
+  
+  // Development - use environment variable or fallback to network IP
+  return getEnvVar('EXPO_PUBLIC_WS_URL', 'http://192.168.1.4:3001');
+};
 
 module.exports = {
   expo: {
@@ -25,7 +56,16 @@ module.exports = {
         NSAppTransportSecurity: {
           NSAllowsArbitraryLoads: true,
           NSExceptionDomains: {
-            "192.168.1.5": {
+            "localhost": {
+              NSExceptionAllowsInsecureHTTPLoads: true,
+              NSExceptionMinimumTLSVersion: "1.0"
+            },
+            "127.0.0.1": {
+              NSExceptionAllowsInsecureHTTPLoads: true,
+              NSExceptionMinimumTLSVersion: "1.0"
+            },
+            // Allow local network access for development
+            "192.168.0.0/16": {
               NSExceptionAllowsInsecureHTTPLoads: true,
               NSExceptionMinimumTLSVersion: "1.0"
             }
@@ -42,7 +82,14 @@ module.exports = {
       usesCleartextTraffic: true,
       networkSecurityConfig: {
         domainConfig: {
-          "192.168.1.5": {
+          "localhost": {
+            cleartextTrafficPermitted: true
+          },
+          "127.0.0.1": {
+            cleartextTrafficPermitted: true
+          },
+          // Allow local network access for development
+          "192.168.0.0/16": {
             cleartextTrafficPermitted: true
           }
         }
@@ -69,14 +116,15 @@ module.exports = {
     plugins: [
       "expo-router",
       "expo-font",
-      [
-        "expo-notifications",
-        {
-          icon: "./assets/icon.png",
-          color: "#0F0F23",
-          sounds: []
-        }
-      ]
+      // Temporarily disable expo-notifications for development to avoid warnings
+      // [
+      //   "expo-notifications",
+      //   {
+      //     icon: "./assets/icon.png",
+      //     color: "#0F0F23",
+      //     sounds: []
+      //   }
+      // ]
     ],
     scheme: "clubcorra",
     // Environment variables
@@ -84,16 +132,11 @@ module.exports = {
       eas: {
         projectId: "c822a055-500c-4010-8669-9dd8530719dc"
       },
-      apiBaseUrl: 'http://192.168.1.5:3001',
-      wsUrl: 'http://192.168.1.5:3001',
-      cdnUrl: 'https://cdn.clubcorra.com',
-      environment: 'development',
-      debugMode: true
-      // apiBaseUrl: process.env.EXPO_PUBLIC_API_BASE_URL,
-      // wsUrl: process.env.EXPO_PUBLIC_WS_URL,
-      // cdnUrl: process.env.EXPO_PUBLIC_CDN_URL,
-      // environment: process.env.NODE_ENV || 'development',
-      // debugMode: process.env.EXPO_PUBLIC_DEBUG_MODE === 'true'
+      apiBaseUrl: getBaseUrl(),
+      wsUrl: getWsUrl(),
+      cdnUrl: getEnvVar('EXPO_PUBLIC_CDN_URL', 'https://cdn.clubcorra.com'),
+      environment: process.env.NODE_ENV || 'development',
+      debugMode: process.env.EXPO_PUBLIC_DEBUG_MODE === 'true'
     }
   }
 };

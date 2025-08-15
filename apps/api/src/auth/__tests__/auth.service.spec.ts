@@ -1,330 +1,361 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuthService } from '../auth.service';
-import { JwtService } from '../jwt.service';
+import { UsersService } from '../../users/users.service';
+import { JwtTokenService } from '../jwt.service';
 import { OtpService } from '../../common/services/otp.service';
 import { EmailService } from '../../common/services/email.service';
-import { SmsService } from '../../common/services/sms.service';
-import { RateLimitService } from '../../common/services/rate-limit.service';
-import { UsersService } from '../../users/users.service';
-import { LoginDto, SignupDto, OtpDto } from '../dto';
-import { AuthResponseDto } from '../dto/auth-response.dto';
-import { User } from '../../users/entities/user.entity';
-import { UserProfile } from '../../users/entities/user-profile.entity';
-import { PaymentDetails } from '../../users/entities/payment-details.entity';
+import { ErrorHandlerService } from '../../common/services/error-handler.service';
+import { UserStatus } from '../../users/entities/user.entity';
+import { BadRequestException } from '@nestjs/common';
 
-describe('AuthService', () => {
+describe('AuthService - Password Setup', () => {
   let service: AuthService;
-  let jwtService: JwtService;
-  let otpService: OtpService;
-  let emailService: EmailService;
-  let smsService: SmsService;
-  let rateLimitService: RateLimitService;
   let usersService: UsersService;
+  let jwtTokenService: JwtTokenService;
 
-  const mockJwtService = {
-    generateToken: jest.fn(),
-    verifyToken: jest.fn(),
-    refreshToken: jest.fn(),
+  const mockUsersService = {
+    findByMobileNumber: jest.fn(),
+    findByEmail: jest.fn(),
+    setPassword: jest.fn(),
+    updateUserStatus: jest.fn(),
+    addEmail: jest.fn(),
+    verifyEmailWithToken: jest.fn(),
+    markEmailVerified: jest.fn(),
+  };
+
+  const mockJwtTokenService = {
+    generateMobileTokens: jest.fn(),
   };
 
   const mockOtpService = {
     generateOtp: jest.fn(),
-    verifyOtp: jest.fn(),
-    sendOtpViaSms: jest.fn(),
-    sendOtpViaEmail: jest.fn(),
   };
 
   const mockEmailService = {
-    sendEmail: jest.fn(),
+    sendOtp: jest.fn(),
   };
 
-  const mockSmsService = {
-    sendSms: jest.fn(),
-  };
-
-  const mockRateLimitService = {
-    checkRateLimit: jest.fn(),
-  };
-
-  const mockUsersService = {
-    createUser: jest.fn(),
-    findByMobileNumber: jest.fn(),
-    findByEmail: jest.fn(),
-    updateUserProfile: jest.fn(),
-    updatePaymentDetails: jest.fn(),
+  const mockErrorHandlerService = {
+    handleAuthError: jest.fn(),
+    logAuthAttempt: jest.fn(),
   };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
-        { provide: JwtService, useValue: mockJwtService },
-        { provide: OtpService, useValue: mockOtpService },
-        { provide: EmailService, useValue: mockEmailService },
-        { provide: SmsService, useValue: mockSmsService },
-        { provide: RateLimitService, useValue: mockRateLimitService },
-        { provide: UsersService, useValue: mockUsersService },
+        {
+          provide: UsersService,
+          useValue: mockUsersService,
+        },
+        {
+          provide: JwtTokenService,
+          useValue: mockJwtTokenService,
+        },
+        {
+          provide: OtpService,
+          useValue: mockOtpService,
+        },
+        {
+          provide: EmailService,
+          useValue: mockEmailService,
+        },
+        {
+          provide: ErrorHandlerService,
+          useValue: mockErrorHandlerService,
+        },
       ],
     }).compile();
 
     service = module.get<AuthService>(AuthService);
-    jwtService = module.get<JwtService>(JwtService);
-    otpService = module.get<OtpService>(OtpService);
-    emailService = module.get<EmailService>(EmailService);
-    smsService = module.get<SmsService>(SmsService);
-    rateLimitService = module.get<RateLimitService>(RateLimitService);
     usersService = module.get<UsersService>(UsersService);
+    jwtTokenService = module.get<JwtTokenService>(JwtTokenService);
   });
 
   afterEach(() => {
     jest.clearAllMocks();
   });
 
-  describe('signup', () => {
-    it('should create a new user and send OTP', async () => {
-      const signupDto: SignupDto = {
-        mobileNumber: '+919876543210',
-        email: 'test@example.com',
-        firstName: 'John',
-        lastName: 'Doe',
-        dateOfBirth: '1990-01-01',
-        upiId: 'john.doe@upi',
-      };
+  describe('setupSignupPassword', () => {
+    const mockPasswordSetupDto = {
+      mobileNumber: '9876543210',
+      password: 'TestPassword123',
+      confirmPassword: 'TestPassword123',
+    };
 
-      const mockUser: User = {
-        id: '123',
-        mobileNumber: '+919876543210',
-        email: 'test@example.com',
-        isMobileVerified: false,
-        isEmailVerified: false,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        profile: null,
-        paymentDetails: null,
-        authProviders: [],
-      };
+    const mockUser = {
+      id: 'user-123',
+      mobileNumber: '9876543210',
+      email: null,
+      status: UserStatus.PENDING,
+      isMobileVerified: true,
+      passwordHash: null,
+    };
 
-      const mockOtp = '123456';
+    const mockTokens = {
+      accessToken: 'access-token-123',
+      refreshToken: 'refresh-token-123',
+      expiresIn: 3600,
+    };
 
-      mockUsersService.createUser.mockResolvedValue(mockUser);
-      mockOtpService.generateOtp.mockResolvedValue(mockOtp);
-      mockSmsService.sendSms.mockResolvedValue(true);
-      mockEmailService.sendEmail.mockResolvedValue(true);
-      mockRateLimitService.checkRateLimit.mockResolvedValue(true);
-
-      const result = await service.signup(signupDto);
-
-      expect(result.success).toBe(true);
-      expect(result.message).toContain('User registered successfully');
-      expect(result.data.requiresOtpVerification).toBe(true);
-      expect(mockUsersService.createUser).toHaveBeenCalledWith(signupDto);
-      expect(mockSmsService.sendSms).toHaveBeenCalledWith(signupDto.mobileNumber, expect.stringContaining(mockOtp));
-      expect(mockEmailService.sendEmail).toHaveBeenCalledWith(signupDto.email, expect.stringContaining(mockOtp));
-    });
-
-    it('should handle existing user signup', async () => {
-      const signupDto: SignupDto = {
-        mobileNumber: '+919876543210',
-        email: 'test@example.com',
-        firstName: 'John',
-        lastName: 'Doe',
-      };
-
-      mockUsersService.findByMobileNumber.mockResolvedValue({ id: '123' } as User);
-
-      await expect(service.signup(signupDto)).rejects.toThrow('User already exists');
-    });
-
-    it('should handle rate limiting', async () => {
-      const signupDto: SignupDto = {
-        mobileNumber: '+919876543210',
-        email: 'test@example.com',
-        firstName: 'John',
-        lastName: 'Doe',
-      };
-
-      mockRateLimitService.checkRateLimit.mockRejectedValue(new Error('Rate limit exceeded'));
-
-      await expect(service.signup(signupDto)).rejects.toThrow('Rate limit exceeded');
-    });
-  });
-
-  describe('login', () => {
-    it('should authenticate user with valid OTP', async () => {
-      const loginDto: LoginDto = {
-        mobileNumber: '+919876543210',
-        otp: '123456',
-      };
-
-      const mockUser: User = {
-        id: '123',
-        mobileNumber: '+919876543210',
-        email: 'test@example.com',
-        isMobileVerified: true,
-        isEmailVerified: true,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        profile: null,
-        paymentDetails: null,
-        authProviders: [],
-      };
-
-      const mockTokens = {
-        accessToken: 'jwt-token',
-        refreshToken: 'refresh-token',
-      };
-
+    it('should successfully setup password and activate account immediately', async () => {
+      // Arrange
       mockUsersService.findByMobileNumber.mockResolvedValue(mockUser);
-      mockOtpService.verifyOtp.mockResolvedValue(true);
-      mockJwtService.generateToken.mockResolvedValue(mockTokens);
+      mockUsersService.setPassword.mockResolvedValue(undefined);
+      mockUsersService.updateUserStatus.mockResolvedValue(undefined);
+      mockJwtTokenService.generateMobileTokens.mockResolvedValue(mockTokens);
 
-      const result = await service.login(loginDto);
+      // Act
+      const result = await service.setupSignupPassword(mockPasswordSetupDto);
 
-      expect(result.success).toBe(true);
-      expect(result.message).toBe('Login successful');
-      expect(result.data.accessToken).toBe(mockTokens.accessToken);
-      expect(result.data.refreshToken).toBe(mockTokens.refreshToken);
+      // Assert
+      expect(result).toEqual({
+        message: 'Password set successfully. Account activated.',
+        userId: 'user-123',
+        requiresEmailVerification: false,
+        accessToken: 'access-token-123',
+        refreshToken: 'refresh-token-123',
+        expiresIn: 3600,
+      });
+
+      expect(mockUsersService.setPassword).toHaveBeenCalledWith('user-123', 'TestPassword123');
+      expect(mockUsersService.updateUserStatus).toHaveBeenCalledWith('user-123', UserStatus.ACTIVE);
+      expect(mockJwtTokenService.generateMobileTokens).toHaveBeenCalledWith(mockUser);
     });
 
-    it('should reject login with invalid OTP', async () => {
-      const loginDto: LoginDto = {
-        mobileNumber: '+919876543210',
-        otp: '000000',
-      };
+    it('should successfully setup password and activate account even when user has email', async () => {
+      // Arrange
+      const userWithEmail = { ...mockUser, email: 'test@example.com' };
+      mockUsersService.findByMobileNumber.mockResolvedValue(userWithEmail);
+      mockUsersService.setPassword.mockResolvedValue(undefined);
+      mockUsersService.updateUserStatus.mockResolvedValue(undefined);
+      mockJwtTokenService.generateMobileTokens.mockResolvedValue(mockTokens);
 
-      const mockUser: User = {
-        id: '123',
-        mobileNumber: '+919876543210',
-        email: 'test@example.com',
-        isMobileVerified: true,
-        isEmailVerified: true,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        profile: null,
-        paymentDetails: null,
-        authProviders: [],
-      };
+      // Act
+      const result = await service.setupSignupPassword(mockPasswordSetupDto);
 
-      mockUsersService.findByMobileNumber.mockResolvedValue(mockUser);
-      mockOtpService.verifyOtp.mockResolvedValue(false);
+      // Assert
+      expect(result).toEqual({
+        message: 'Password set successfully. Account activated.',
+        userId: 'user-123',
+        requiresEmailVerification: false,
+        accessToken: 'access-token-123',
+        refreshToken: 'refresh-token-123',
+        expiresIn: 3600,
+      });
 
-      await expect(service.login(loginDto)).rejects.toThrow('Invalid OTP');
+      expect(mockUsersService.updateUserStatus).toHaveBeenCalledWith('user-123', UserStatus.ACTIVE);
     });
 
-    it('should reject login for non-existent user', async () => {
-      const loginDto: LoginDto = {
-        mobileNumber: '+919876543210',
-        otp: '123456',
-      };
-
+    it('should throw error if user is not found', async () => {
+      // Arrange
       mockUsersService.findByMobileNumber.mockResolvedValue(null);
 
-      await expect(service.login(loginDto)).rejects.toThrow('User not found');
+      // Act & Assert
+      await expect(service.setupSignupPassword(mockPasswordSetupDto))
+        .rejects
+        .toThrow(BadRequestException);
+      
+      expect(mockUsersService.setPassword).not.toHaveBeenCalled();
+      expect(mockUsersService.updateUserStatus).not.toHaveBeenCalled();
+    });
+
+    it('should throw error if user status is not PENDING', async () => {
+      // Arrange
+      const activeUser = { ...mockUser, status: UserStatus.ACTIVE };
+      mockUsersService.findByMobileNumber.mockResolvedValue(activeUser);
+
+      // Act & Assert
+      await expect(service.setupSignupPassword(mockPasswordSetupDto))
+        .rejects
+        .toThrow(BadRequestException);
+      
+      expect(mockUsersService.setPassword).not.toHaveBeenCalled();
+    });
+
+    it('should throw error if user already has password', async () => {
+      // Arrange
+      const userWithPassword = { ...mockUser, passwordHash: 'existing-hash' };
+      mockUsersService.findByMobileNumber.mockResolvedValue(userWithPassword);
+
+      // Act & Assert
+      await expect(service.setupSignupPassword(mockPasswordSetupDto))
+        .rejects
+        .toThrow(BadRequestException);
+      
+      expect(mockUsersService.setPassword).not.toHaveBeenCalled();
+    });
+
+    it('should throw error if mobile number is not verified', async () => {
+      // Arrange
+      const unverifiedUser = { ...mockUser, isMobileVerified: false };
+      mockUsersService.findByMobileNumber.mockResolvedValue(unverifiedUser);
+      mockUsersService.setPassword.mockResolvedValue(undefined);
+
+      // Act & Assert
+      await expect(service.setupSignupPassword(mockPasswordSetupDto))
+        .rejects
+        .toThrow(BadRequestException);
+      
+      expect(mockUsersService.updateUserStatus).not.toHaveBeenCalled();
+    });
+
+    it('should throw error if passwords do not match', async () => {
+      // Arrange
+      const mismatchedPasswords = {
+        ...mockPasswordSetupDto,
+        confirmPassword: 'DifferentPassword123',
+      };
+
+      // Act & Assert
+      await expect(service.setupSignupPassword(mismatchedPasswords))
+        .rejects
+        .toThrow(BadRequestException);
+      
+      expect(mockUsersService.findByMobileNumber).not.toHaveBeenCalled();
+    });
+
+    it('should throw error if password is too weak', async () => {
+      // Arrange
+      const weakPassword = {
+        ...mockPasswordSetupDto,
+        password: 'weak',
+        confirmPassword: 'weak',
+      };
+
+      // Act & Assert
+      await expect(service.setupSignupPassword(weakPassword))
+        .rejects
+        .toThrow(BadRequestException);
+      
+      expect(mockUsersService.findByMobileNumber).not.toHaveBeenCalled();
+    });
+
+    it('should handle service errors gracefully', async () => {
+      // Arrange
+      mockUsersService.findByMobileNumber.mockRejectedValue(new Error('Database error'));
+
+      // Act & Assert
+      await expect(service.setupSignupPassword(mockPasswordSetupDto))
+        .rejects
+        .toThrow(BadRequestException);
     });
   });
 
-  describe('verifyOtp', () => {
-    it('should verify SMS OTP successfully', async () => {
-      const otpDto: OtpDto = {
-        mobileNumber: '+919876543210',
-        otp: '123456',
-        type: 'SMS',
-      };
+  describe('addSignupEmail', () => {
+    const mockEmailDto = {
+      mobileNumber: '9876543210',
+      email: 'test@example.com',
+    };
 
-      const mockUser: User = {
-        id: '123',
-        mobileNumber: '+919876543210',
-        email: 'test@example.com',
-        isMobileVerified: false,
-        isEmailVerified: false,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        profile: null,
-        paymentDetails: null,
-        authProviders: [],
-      };
+    const mockUser = {
+      id: 'user-123',
+      mobileNumber: '9876543210',
+      email: null,
+      status: UserStatus.PENDING,
+      passwordHash: 'hashed-password',
+    };
 
-      const mockTokens = {
-        accessToken: 'jwt-token',
-        refreshToken: 'refresh-token',
-      };
-
+    it('should successfully add email and send verification', async () => {
+      // Arrange
       mockUsersService.findByMobileNumber.mockResolvedValue(mockUser);
-      mockOtpService.verifyOtp.mockResolvedValue(true);
-      mockJwtService.generateToken.mockResolvedValue(mockTokens);
+      mockUsersService.findByEmail.mockResolvedValue(null);
+      mockUsersService.addEmail.mockResolvedValue(undefined);
+      mockOtpService.generateOtp.mockResolvedValue('123456');
+      mockEmailService.sendOtp.mockResolvedValue(undefined);
 
-      const result = await service.verifyOtp(otpDto);
+      // Act
+      const result = await service.addSignupEmail(mockEmailDto);
 
-      expect(result.success).toBe(true);
-      expect(result.message).toBe('OTP verified successfully');
-      expect(result.data.accessToken).toBe(mockTokens.accessToken);
+      // Assert
+      expect(result).toEqual({
+        message: 'Email added successfully. Please check your email for verification.',
+        userId: 'user-123',
+        accountActivated: false,
+        accessToken: '',
+        refreshToken: '',
+        expiresIn: 0,
+      });
+
+      expect(mockUsersService.addEmail).toHaveBeenCalledWith('user-123', 'test@example.com');
+      expect(mockOtpService.generateOtp).toHaveBeenCalledWith('test@example.com', 'EMAIL');
+      expect(mockEmailService.sendOtp).toHaveBeenCalledWith('test@example.com', '123456');
     });
 
-    it('should verify email OTP successfully', async () => {
-      const otpDto: OtpDto = {
-        email: 'test@example.com',
-        otp: '123456',
-        type: 'EMAIL',
-      };
+    it('should throw error if email is already used by another user', async () => {
+      // Arrange
+      const existingUser = { id: 'other-user', mobileNumber: '1111111111' };
+      mockUsersService.findByEmail.mockResolvedValue(existingUser);
+      mockUsersService.findByMobileNumber.mockResolvedValue(mockUser);
 
-      const mockUser: User = {
-        id: '123',
-        mobileNumber: '+919876543210',
-        email: 'test@example.com',
-        isMobileVerified: true,
-        isEmailVerified: false,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        profile: null,
-        paymentDetails: null,
-        authProviders: [],
-      };
-
-      const mockTokens = {
-        accessToken: 'jwt-token',
-        refreshToken: 'refresh-token',
-      };
-
-      mockUsersService.findByEmail.mockResolvedValue(mockUser);
-      mockOtpService.verifyOtp.mockResolvedValue(true);
-      mockJwtService.generateToken.mockResolvedValue(mockTokens);
-
-      const result = await service.verifyOtp(otpDto);
-
-      expect(result.success).toBe(true);
-      expect(result.message).toBe('OTP verified successfully');
-      expect(result.data.accessToken).toBe(mockTokens.accessToken);
+      // Act & Assert
+      await expect(service.addSignupEmail(mockEmailDto))
+        .rejects
+        .toThrow(BadRequestException);
+      
+      expect(mockUsersService.addEmail).not.toHaveBeenCalled();
     });
-  });
 
-  describe('refreshToken', () => {
-    it('should refresh access token successfully', async () => {
-      const refreshToken = 'refresh-token';
-      const mockTokens = {
-        accessToken: 'new-jwt-token',
-        refreshToken: 'new-refresh-token',
-      };
+    it('should allow same user to add email', async () => {
+      // Arrange
+      mockUsersService.findByEmail.mockResolvedValue(mockUser); // Same user
+      mockUsersService.findByMobileNumber.mockResolvedValue(mockUser);
+      mockUsersService.addEmail.mockResolvedValue(undefined);
+      mockOtpService.generateOtp.mockResolvedValue('123456');
+      mockEmailService.sendOtp.mockResolvedValue(undefined);
 
-      mockJwtService.refreshToken.mockResolvedValue(mockTokens);
+      // Act
+      const result = await service.addSignupEmail(mockEmailDto);
 
-      const result = await service.refreshToken(refreshToken);
-
-      expect(result.success).toBe(true);
-      expect(result.message).toBe('Token refreshed successfully');
-      expect(result.data.accessToken).toBe(mockTokens.accessToken);
-      expect(result.data.refreshToken).toBe(mockTokens.refreshToken);
+      // Assert
+      expect(result).toBeDefined();
+      expect(mockUsersService.addEmail).toHaveBeenCalled();
     });
   });
 
-  describe('logout', () => {
-    it('should logout user successfully', async () => {
-      const userId = '123';
+  describe('verifySignupEmail', () => {
+    const mockEmailVerificationDto = {
+      token: 'verification-token-123',
+    };
 
-      const result = await service.logout(userId);
+    const mockUser = {
+      id: 'user-123',
+      mobileNumber: '9876543210',
+      email: 'test@example.com',
+      status: UserStatus.PENDING,
+      passwordHash: 'hashed-password',
+    };
 
-      expect(result.success).toBe(true);
-      expect(result.message).toBe('Logout successful');
-      expect(result.data).toBeNull();
+    const mockTokens = {
+      accessToken: 'access-token-123',
+      refreshToken: 'refresh-token-123',
+      expiresIn: 3600,
+    };
+
+    it('should successfully verify email and activate account', async () => {
+      // Arrange
+      mockUsersService.verifyEmailWithToken.mockResolvedValue(mockUser);
+      mockUsersService.markEmailVerified.mockResolvedValue(undefined);
+      mockUsersService.updateUserStatus.mockResolvedValue(undefined);
+      mockJwtTokenService.generateMobileTokens.mockResolvedValue(mockTokens);
+      mockErrorHandlerService.logAuthAttempt.mockResolvedValue(undefined);
+
+      // Act
+      const result = await service.verifySignupEmail(mockEmailVerificationDto);
+
+      // Assert
+      expect(result).toEqual({
+        message: 'Email verified successfully. Account activated.',
+        userId: 'user-123',
+        accountActivated: true,
+        accessToken: 'access-token-123',
+        refreshToken: 'refresh-token-123',
+        expiresIn: 3600,
+      });
+
+      expect(mockUsersService.markEmailVerified).toHaveBeenCalledWith('user-123');
+      expect(mockUsersService.updateUserStatus).toHaveBeenCalledWith('user-123', UserStatus.ACTIVE);
+      expect(mockJwtTokenService.generateMobileTokens).toHaveBeenCalledWith(mockUser);
     });
   });
 });

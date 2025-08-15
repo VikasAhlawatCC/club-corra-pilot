@@ -20,6 +20,7 @@ import {
 } from './dto/signup.dto';
 import {
   MobileLoginDto,
+  MobilePasswordLoginDto,
   EmailLoginDto,
   OAuthLoginDto,
   RefreshTokenDto,
@@ -44,6 +45,7 @@ import { InitialSignupDto, InitialSignupResponseDto } from './dto/initial-signup
 import { SignupOtpVerificationDto, SignupOtpVerificationResponseDto } from './dto/signup-otp-verification.dto';
 import { SignupPasswordSetupDto, SignupPasswordSetupResponseDto } from './dto/signup-password-setup.dto';
 import { SignupEmailVerificationDto, SignupEmailVerificationResponseDto } from './dto/signup-email-verification.dto';
+import { AdminService } from '../admin/admin.service';
 
 /**
  * Authentication service providing user signup, login, OTP verification, and OAuth integration
@@ -62,6 +64,7 @@ export class AuthService {
     private configService: ConfigService,
     private jwtTokenService: JwtTokenService,
     private errorHandler: ErrorHandlerService,
+    private adminService: AdminService,
   ) {}
 
   /**
@@ -325,6 +328,44 @@ export class AuthService {
 
     // Find user by email
     const user = await this.usersService.findByEmail(email);
+    if (!user) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    // Check if user has password set
+    if (!(await this.usersService.hasPassword(user.id))) {
+      throw new BadRequestException('Password not set for this account. Please use OTP login or set a password first.');
+    }
+
+    // Validate password
+    const isValidPassword = await this.usersService.validatePassword(user.id, password);
+    if (!isValidPassword) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    if (user.status !== UserStatus.ACTIVE) {
+      throw new UnauthorizedException('User account is not active');
+    }
+
+    // Update last login
+    await this.usersService.updateLastLogin(user.id);
+
+    // Generate tokens using the new JWT service
+    const tokens = await this.jwtTokenService.generateMobileTokens(user);
+
+    return {
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      user,
+      expiresIn: tokens.expiresIn,
+    };
+  }
+
+  async mobilePasswordLogin(mobilePasswordLoginDto: MobilePasswordLoginDto) {
+    const { mobileNumber, password } = mobilePasswordLoginDto;
+
+    // Find user by mobile number
+    const user = await this.usersService.findByMobileNumber(mobileNumber);
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
     }
@@ -803,8 +844,8 @@ export class AuthService {
       await this.usersService.setPassword(user.id, password);
 
       // Check if user can be activated (mobile verified + password set)
-      if (user.isMobileVerified && !user.email) {
-        // No email provided, activate account immediately
+      if (user.isMobileVerified) {
+        // Mobile is verified and password is set, activate account immediately
         await this.usersService.updateUserStatus(user.id, UserStatus.ACTIVE);
         
         // Generate tokens
@@ -819,12 +860,8 @@ export class AuthService {
           expiresIn: tokens.expiresIn,
         };
       } else {
-        // Email provided, requires email verification
-        return {
-          message: 'Password set successfully. Please verify your email to activate account.',
-          userId: user.id,
-          requiresEmailVerification: true,
-        };
+        // Mobile not verified, this shouldn't happen in normal flow
+        throw new BadRequestException('Mobile number must be verified before setting password');
       }
     } catch (error) {
       this.logger.error(`Signup password setup failed: ${error.message}`);
@@ -924,5 +961,106 @@ export class AuthService {
     }
   }
 
+  /**
+   * Admin login with email and password
+   * @param email - Admin email (must be @clubcorra.com domain)
+   * @param password - Admin password
+   * @returns Promise with admin authentication result
+   */
+  async adminLogin(email: string, password: string) {
+    try {
+      // Check if email is from @clubcorra.com domain
+      if (!email.endsWith('@clubcorra.com')) {
+        throw new UnauthorizedException('Only @clubcorra.com emails are allowed for admin access');
+      }
+
+      // Find admin user by email in the admins table
+      const adminUser = await this.adminService.findByEmail(email);
+      if (!adminUser) {
+        throw new UnauthorizedException('Admin user not found');
+      }
+
+      // Check if admin is active
+      if (adminUser.status !== 'ACTIVE') {
+        throw new UnauthorizedException('Admin account is not active');
+      }
+
+      // Verify password
+      const isPasswordValid = await this.adminService.verifyPassword(adminUser.id, password);
+      if (!isPasswordValid) {
+        throw new UnauthorizedException('Invalid credentials');
+      }
+
+      // Update last login
+      await this.adminService.updateLastLogin(adminUser.id);
+
+      // Generate admin tokens
+      const tokens = await this.jwtTokenService.generateMobileTokens({
+        id: adminUser.id,
+        email: adminUser.email,
+        role: adminUser.role,
+      });
+
+      this.errorHandler.logAuthAttempt('admin_login', adminUser.id, true);
+
+      return {
+        success: true,
+        message: 'Admin login successful',
+        data: {
+          user: {
+            id: adminUser.id,
+            email: adminUser.email,
+            name: `${adminUser.firstName} ${adminUser.lastName}`,
+            role: adminUser.role,
+            permissions: adminUser.permissions ? JSON.parse(adminUser.permissions) : ['transactions', 'brands', 'categories', 'users', 'coins', 'payments']
+          },
+          accessToken: tokens.accessToken,
+          refreshToken: tokens.refreshToken,
+          expiresIn: tokens.expiresIn
+        }
+      };
+    } catch (error) {
+      this.errorHandler.logAuthAttempt('admin_login', undefined, false, { email });
+      throw error;
+    }
+  }
+
+  /**
+   * Verify admin user from JWT token
+   * @param user - User object from JWT payload
+   * @returns Promise with admin verification result
+   */
+  async adminVerify(user: any) {
+    try {
+      if (!user || !user.id) {
+        throw new UnauthorizedException('Invalid user token');
+      }
+
+      const adminUser = await this.adminService.findById(user.id);
+      if (!adminUser) {
+        throw new UnauthorizedException('Admin user not found');
+      }
+
+      if (adminUser.status !== 'ACTIVE') {
+        throw new UnauthorizedException('Admin account is not active');
+      }
+
+      return {
+        success: true,
+        message: 'Admin verification successful',
+        data: {
+          user: {
+            id: adminUser.id,
+            email: adminUser.email,
+            name: `${adminUser.firstName} ${adminUser.lastName}`,
+            role: adminUser.role,
+            permissions: adminUser.permissions ? JSON.parse(adminUser.permissions) : ['transactions', 'brands', 'categories', 'users', 'coins', 'payments']
+          }
+        }
+      };
+    } catch (error) {
+      throw error;
+    }
+  }
 
 }

@@ -14,17 +14,33 @@ import type { CoinTransaction } from '@shared/schemas'
 interface TransactionTableProps {
   transactions: CoinTransaction[]
   onView?: (transaction: CoinTransaction) => void
+  onTransactionSelect?: (transaction: CoinTransaction) => void
   onApprove?: (transactionId: string, adminNotes?: string) => void
   onReject?: (transactionId: string, reason: string, adminNotes?: string) => void
-  onProcessPayment?: (transactionId: string, adminTransactionId: string, adminNotes?: string) => void
+  onApproveEarn?: (transactionId: string, adminNotes?: string) => void
+  onRejectEarn?: (transactionId: string, adminNotes: string) => void
+  onApproveRedeem?: (transactionId: string, adminNotes?: string) => void
+  onRejectRedeem?: (transactionId: string, adminNotes: string) => void
+  onProcessPayment?: (
+    transactionId: string, 
+    paymentTransactionId: string, 
+    paymentMethod: string, 
+    paymentAmount: number, 
+    adminNotes?: string
+  ) => void
   isLoading?: boolean
 }
 
 export function TransactionTable({ 
   transactions, 
   onView, 
+  onTransactionSelect,
   onApprove, 
   onReject, 
+  onApproveEarn,
+  onRejectEarn,
+  onApproveRedeem,
+  onRejectRedeem,
   onProcessPayment,
   isLoading = false 
 }: TransactionTableProps) {
@@ -121,7 +137,13 @@ export function TransactionTable({
         break
       case 'payment':
         if (!paymentTransactionId.trim()) return
-        onProcessPayment?.(selectedTransaction.id, paymentTransactionId, adminNotes)
+        onProcessPayment?.(
+          selectedTransaction.id, 
+          paymentTransactionId, 
+          'bank_transfer', // Default payment method
+          selectedTransaction.amount, // Use transaction amount
+          adminNotes
+        )
         break
     }
 

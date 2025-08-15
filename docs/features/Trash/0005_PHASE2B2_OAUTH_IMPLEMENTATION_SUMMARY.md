@@ -118,7 +118,7 @@ This document summarizes the successful implementation of Phase 2B.2 OAuth Integ
 ```env
 EXPO_PUBLIC_GOOGLE_CLIENT_ID=your_google_client_id_here
 EXPO_PUBLIC_GOOGLE_REDIRECT_URI=clubcorra://auth/callback
-EXPO_PUBLIC_API_BASE_URL=http://192.168.1.5:3001
+EXPO_PUBLIC_API_BASE_URL=http://192.168.1.4:3001
 ```
 
 ### Google Cloud Console Setup

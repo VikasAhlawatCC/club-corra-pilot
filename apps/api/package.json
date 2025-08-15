@@ -16,7 +16,7 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
-    "test:debug": "node --inspect-brkt node_modules/.bin/jest --runInBand",
+    "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "test:unit": "jest --selectProjects='Unit Tests'",
     "test:integration": "jest --selectProjects='Integration Tests'",
@@ -28,10 +28,12 @@
     "test:runner": "ts-node scripts/run-tests.ts",
     "test:setup-db": "ts-node scripts/setup-test-db.ts",
     "typeorm": "typeorm-ts-node-commonjs",
-    "migration:generate": "npm run typeorm -- migration:generate -d src/config/typeorm-migration.config.ts",
-    "migration:run": "npm run typeorm -- migration:run -d src/config/typeorm-migration.config.ts",
-    "migration:revert": "npm run typeorm -- migration:revert -d src/config/typeorm-migration.config.ts",
-    "seed:demo": "ts-node -r tsconfig-paths/register src/scripts/seed-demo-data.ts"
+    "migration:generate": "npm run typeorm -- migration:generate -d src/config/typeorm.config.ts",
+    "migration:run": "npm run typeorm -- migration:run -d src/config/typeorm.config.ts",
+    "migration:revert": "npm run typeorm -- migration:revert -d src/config/typeorm.config.ts",
+    "seed:demo": "ts-node src/scripts/seed-demo-data.ts",
+    "create:admin": "ts-node src/scripts/create-admin-user.ts",
+    "create:admin:simple": "ts-node src/scripts/create-admin-user-simple.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.864.0",
@@ -59,8 +61,10 @@
     "reflect-metadata": "^0.1.13",
     "rxjs": "^7.8.1",
     "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1",
     "twilio": "^4.19.0",
     "typeorm": "^0.3.17",
+    "ws": "^8.18.3",
     "zod": "^3.22.4"
   },
   "devDependencies": {

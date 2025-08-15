@@ -14,7 +14,7 @@ export default function LoginScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   
-  const { login, loginWithEmail, sendLoginOTP } = useAuthStore();
+  const { login, loginWithEmail, loginWithMobilePassword, sendLoginOTP } = useAuthStore();
 
   const handleLogin = async () => {
     const id = identifier.trim();
@@ -25,20 +25,35 @@ export default function LoginScreen() {
       return;
     }
 
+    if (!pwd) {
+      setIsLoading(false);
+      Alert.alert('Missing Password', 'Please enter your password');
+      return;
+    }
+
     setIsLoading(true);
     try {
       if (id.includes('@')) {
-        if (!pwd) {
-          setIsLoading(false);
-          Alert.alert('Missing Password', 'Please enter your password');
-          return;
-        }
+        // Email login
         await loginWithEmail(id, pwd);
         router.replace('/(tabs)/home');
       } else {
-        // Phone-based login uses OTP. Send OTP then navigate to OTP screen.
-        await sendLoginOTP(id);
-        router.push('/auth/login-otp');
+        // Mobile number login - try password first, fallback to OTP if no password
+        try {
+          await loginWithMobilePassword(id, pwd);
+          router.replace('/(tabs)/home');
+        } catch (passwordError) {
+          // If password login fails, check if it's because user doesn't have password
+          if (passwordError instanceof Error && 
+              (passwordError.message.includes('Password not set') || 
+               passwordError.message.includes('Invalid credentials'))) {
+            // Fallback to OTP login
+            await sendLoginOTP(id);
+            router.push('/auth/login-otp');
+          } else {
+            throw passwordError;
+          }
+        }
       }
     } catch (error) {
       setIsLoading(false);
@@ -54,9 +69,34 @@ export default function LoginScreen() {
     router.back();
   };
 
-  const handleForgotPassword = () => {
-    // TODO: Implement forgot password flow in Phase 2B
-    Alert.alert('Forgot Password', 'Password reset functionality will be implemented in Phase 2B');
+  const handleForgotPassword = async () => {
+    const id = identifier.trim();
+    
+    if (!id) {
+      Alert.alert('Missing Information', 'Please enter your mobile number or email first');
+      return;
+    }
+
+    if (id.includes('@')) {
+      // For email, show message about password reset
+      Alert.alert('Password Reset', 'Password reset functionality will be implemented in Phase 2B');
+    } else {
+      // For mobile number, send OTP for password reset
+      try {
+        setIsLoading(true);
+        await sendLoginOTP(id);
+        Alert.alert('OTP Sent', 'An OTP has been sent to your mobile number for password reset');
+        router.push('/auth/login-otp');
+      } catch (error) {
+        if (error instanceof Error) {
+          Alert.alert('Error', error.message);
+        } else {
+          Alert.alert('Error', 'Failed to send OTP. Please try again.');
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    }
   };
 
   const handleGoogleLogin = () => {
@@ -67,9 +107,32 @@ export default function LoginScreen() {
     });
   };
 
-  const handleOtpLogin = () => {
-    // Navigate to OTP-based login
-    router.push('/auth/login-otp');
+  const handleOtpLogin = async () => {
+    const id = identifier.trim();
+    
+    if (!id) {
+      Alert.alert('Missing Information', 'Please enter your mobile number first');
+      return;
+    }
+
+    if (id.includes('@')) {
+      Alert.alert('Invalid Input', 'OTP login is only available for mobile numbers');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      await sendLoginOTP(id);
+      router.push('/auth/login-otp');
+    } catch (error) {
+      if (error instanceof Error) {
+        Alert.alert('Error', error.message);
+      } else {
+        Alert.alert('Error', 'Failed to send OTP. Please try again.');
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -110,7 +173,7 @@ export default function LoginScreen() {
                 onChangeText={setIdentifier}
                 autoCapitalize="none"
                 autoCorrect={false}
-                keyboardType="email-address"
+                keyboardType={identifier.includes('@') ? 'email-address' : 'phone-pad'}
               />
             </View>
 

@@ -17,6 +17,8 @@ import {
 } from '@heroicons/react/24/outline'
 import Link from 'next/link'
 import { Skeleton, SkeletonCard } from '@/components/common'
+import { useAdminWebSocket } from '@/hooks/useWebSocket'
+import { transactionApi } from '@/lib/api'
 
 interface DashboardStats {
   totalUsers: number
@@ -54,12 +56,37 @@ export default function DashboardPage() {
   const [recentTransactions, setRecentTransactions] = useState<RecentTransaction[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
+  // WebSocket integration for real-time updates
+  const { isConnected, pendingRequestCounts, recentActivity } = useAdminWebSocket()
+
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        // TODO: Replace with actual API call
+        // Fetch real transaction statistics
+        const transactionStats = await transactionApi.getTransactionStats()
+        if (transactionStats.success) {
+          const data = transactionStats.data
+          setStats(prev => ({
+            ...prev,
+            pendingEarnRequests: data.pendingEarnRequests || prev.pendingEarnRequests,
+            pendingRedeemRequests: data.pendingRedeemRequests || prev.pendingRedeemRequests,
+            totalPendingRequests: (data.pendingEarnRequests || 0) + (data.pendingRedeemRequests || 0)
+          }))
+        }
+        
+        // TODO: Replace other stats with actual API calls
         await new Promise(resolve => setTimeout(resolve, 1000)) // Simulate API delay
         
+        // Update stats with real-time data if available
+        if (pendingRequestCounts.total > 0) {
+          setStats(prev => ({
+            ...prev,
+            pendingEarnRequests: pendingRequestCounts.earn,
+            pendingRedeemRequests: pendingRequestCounts.redeem,
+            totalPendingRequests: pendingRequestCounts.total
+          }))
+        }
+
         setRecentTransactions([
           {
             id: '1',
@@ -100,6 +127,10 @@ export default function DashboardPage() {
         ])
       } catch (error) {
         console.error('Failed to fetch dashboard data:', error)
+        // Show error message to user
+        if (error instanceof Error && error.message.includes('Unauthorized')) {
+          console.error('Authentication error - user may need to re-login')
+        }
       } finally {
         setIsLoading(false)
       }
@@ -230,6 +261,12 @@ export default function DashboardPage() {
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Dashboard</h1>
           <p className="text-gray-600 mt-1">Welcome to Club Corra Admin Portal</p>
+          <div className="flex items-center space-x-2 mt-2">
+            <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
+            <span className="text-sm text-gray-500">
+              {isConnected ? 'Live Updates Connected' : 'Offline - No Real-time Updates'}
+            </span>
+          </div>
         </div>
         
         {/* Quick Actions */}
