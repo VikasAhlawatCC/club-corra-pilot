@@ -43,45 +43,11 @@ export default function AuthLayout() {
         }}
       />
       
-      {/* New Auth Flow Screens */}
-      <Stack.Screen 
-        name="new-signup" 
-        options={{
-          // Initial signup screen
-          animation: 'slide_from_right',
-          animationDuration: 350,
-        }}
-      />
-      <Stack.Screen 
-        name="new-otp-verification" 
-        options={{
-          // OTP verification screen
-          animation: 'slide_from_right',
-          animationDuration: 300,
-        }}
-      />
-      <Stack.Screen 
-        name="new-password-setup" 
-        options={{
-          // Password setup screen
-          animation: 'slide_from_right',
-          animationDuration: 350,
-        }}
-      />
-      <Stack.Screen 
-        name="new-email-verification" 
-        options={{
-          // Email verification screen
-          animation: 'slide_from_right',
-          animationDuration: 350,
-        }}
-      />
-      
-      {/* Legacy Screens (maintained for backward compatibility) */}
+      {/* Auth Flow Screens */}
       <Stack.Screen 
         name="register" 
         options={{
-          // Smooth slide animation for registration flow
+          // Registration screen
           animation: 'slide_from_right',
           animationDuration: 350,
         }}
@@ -89,15 +55,23 @@ export default function AuthLayout() {
       <Stack.Screen 
         name="otp-verification" 
         options={{
-          // Quick slide animation for OTP screen
+          // OTP verification screen
           animation: 'slide_from_right',
           animationDuration: 300,
         }}
       />
       <Stack.Screen 
+        name="password-setup" 
+        options={{
+          // Password setup screen
+          animation: 'slide_from_right',
+          animationDuration: 350,
+        }}
+      />
+      <Stack.Screen 
         name="email-verification" 
         options={{
-          // Smooth transition for email verification
+          // Email verification screen
           animation: 'slide_from_right',
           animationDuration: 350,
         }}
@@ -105,23 +79,15 @@ export default function AuthLayout() {
       <Stack.Screen 
         name="profile-setup" 
         options={{
-          // Elegant slide animation for profile setup
+          // Profile setup screen
           animation: 'slide_from_right',
           animationDuration: 350,
         }}
       />
       <Stack.Screen 
-        name="password-setup" 
-        options={{
-          // Final step with enhanced animation
-          animation: 'slide_from_right',
-          animationDuration: 400,
-        }}
-      />
-      <Stack.Screen 
         name="login" 
         options={{
-          // Smooth login animation
+          // Login screen
           animation: 'slide_from_right',
           animationDuration: 350,
         }}
@@ -129,7 +95,7 @@ export default function AuthLayout() {
       <Stack.Screen 
         name="login-otp" 
         options={{
-          // Quick OTP login animation
+          // OTP login screen
           animation: 'slide_from_right',
           animationDuration: 300,
         }}
@@ -137,7 +103,7 @@ export default function AuthLayout() {
       <Stack.Screen 
         name="google-auth" 
         options={{
-          // OAuth animation
+          // OAuth screen
           animation: 'slide_from_right',
           animationDuration: 350,
         }}

@@ -60,10 +60,7 @@ export default function AuthChoiceScreen() {
     router.push('/auth/register');
   };
 
-  const handleNewSignup = () => {
-    // Add haptic feedback and smooth navigation to new flow
-    router.push('/auth/new-signup');
-  };
+
 
   
 
@@ -171,26 +168,7 @@ export default function AuthChoiceScreen() {
                 />
               </View>
 
-              {/* New Signup Flow Option */}
-              <View style={styles.optionContainer}>
-                <View style={styles.optionHeader}>
-                  <View style={styles.optionIconContainer}>
-                    <Ionicons name="shield-checkmark" size={24} color={colors.primary[500]} />
-                  </View>
-                  <Text style={styles.optionTitle}>Enhanced Signup Experience</Text>
-                  <Text style={styles.optionSubtitle}>
-                    Try our new step-by-step account creation with enhanced security
-                  </Text>
-                </View>
-                
-                <Button
-                  title="Try New Signup"
-                  onPress={handleNewSignup}
-                  variant="primary"
-                  size="large"
-                  style={styles.choiceButton}
-                />
-              </View>
+
 
               {/* Google OAuth removed from first screen per product requirement */}
             </Card>
