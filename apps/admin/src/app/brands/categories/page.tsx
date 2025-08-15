@@ -1,0 +1,382 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import Link from 'next/link'
+import { PlusIcon, PencilIcon, TrashIcon, EyeIcon } from '@heroicons/react/24/outline'
+import { categoryApi } from '@/lib/api'
+import { useToast } from '@/components/common'
+import type { BrandCategory, CreateBrandCategoryRequest, UpdateBrandCategoryRequest } from '@shared/schemas'
+
+export default function CategoriesPage() {
+  const [categories, setCategories] = useState<BrandCategory[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [editingCategory, setEditingCategory] = useState<BrandCategory | null>(null)
+  const [showDeleteModal, setShowDeleteModal] = useState<string | null>(null)
+  const { showSuccess, showError } = useToast()
+
+  useEffect(() => {
+    fetchCategories()
+  }, [])
+
+  const fetchCategories = async () => {
+    try {
+      setIsLoading(true)
+      const response = await categoryApi.getAllCategories()
+      setCategories(response)
+    } catch (error) {
+      console.error('Failed to fetch categories:', error)
+      showError('Failed to fetch categories')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleCreateCategory = async (data: CreateBrandCategoryRequest) => {
+    try {
+      await categoryApi.createCategory(data)
+      showSuccess('Category created successfully')
+      setShowCreateModal(false)
+      fetchCategories()
+    } catch (error) {
+      console.error('Failed to create category:', error)
+      showError('Failed to create category')
+    }
+  }
+
+  const handleUpdateCategory = async (id: string, data: UpdateBrandCategoryRequest) => {
+    try {
+      await categoryApi.updateCategory(id, data)
+      showSuccess('Category updated successfully')
+      setEditingCategory(null)
+      fetchCategories()
+    } catch (error) {
+      console.error('Failed to update category:', error)
+      showError('Failed to update category')
+    }
+  }
+
+  const handleDeleteCategory = async (id: string) => {
+    try {
+      await categoryApi.deleteCategory(id)
+      showSuccess('Category deleted successfully')
+      setShowDeleteModal(null)
+      fetchCategories()
+    } catch (error) {
+      console.error('Failed to delete category:', error)
+      showError('Failed to delete category')
+    }
+  }
+
+  const handleToggleStatus = async (category: BrandCategory) => {
+    try {
+      // Note: This would need to be implemented in the backend
+      // For now, we'll just show a message
+      showSuccess('Category status updated')
+      fetchCategories()
+    } catch (error) {
+      console.error('Failed to update category status:', error)
+      showError('Failed to update category status')
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="animate-pulse">
+          <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
+          <div className="h-4 bg-gray-200 rounded w-1/2 mb-8"></div>
+          <div className="space-y-4">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="h-16 bg-gray-200 rounded"></div>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Brand Categories</h1>
+          <p className="text-gray-600">Manage brand categories and their properties</p>
+        </div>
+        <button
+          onClick={() => setShowCreateModal(true)}
+          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+        >
+          <PlusIcon className="w-4 h-4 mr-2" />
+          Add Category
+        </button>
+      </div>
+
+      <div className="bg-white shadow rounded-lg">
+        <div className="px-4 py-5 sm:p-6">
+          <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
+            All Categories
+          </h3>
+          
+          {categories.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="text-gray-400 mb-4">
+                <svg className="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+              </div>
+              <h3 className="text-sm font-medium text-gray-900 mb-2">No categories</h3>
+              <p className="text-sm text-gray-500 mb-4">Get started by creating your first brand category.</p>
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-indigo-600 bg-indigo-100 hover:bg-indigo-200"
+              >
+                <PlusIcon className="w-4 h-4 mr-2" />
+                Add Category
+              </button>
+            </div>
+          ) : (
+            <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
+              <table className="min-w-full divide-y divide-gray-300">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Category
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Description
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Icon
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Color
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Brands
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {categories.map((category) => (
+                    <tr key={category.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="text-sm font-medium text-gray-900">
+                            {category.name}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-sm text-gray-900 max-w-xs truncate">
+                          {category.description || 'No description'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {category.icon || '—'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {category.color && (
+                          <div className="flex items-center">
+                            <div 
+                              className="w-6 h-6 rounded border border-gray-300"
+                              style={{ backgroundColor: category.color }}
+                            />
+                            <span className="ml-2 text-sm text-gray-900">{category.color}</span>
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {/* TODO: Get brand count from API */}
+                          —
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <div className="flex justify-end space-x-2">
+                          <button
+                            onClick={() => setEditingCategory(category)}
+                            className="text-indigo-600 hover:text-indigo-900"
+                          >
+                            <PencilIcon className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => setShowDeleteModal(category.id)}
+                            className="text-red-600 hover:text-red-900"
+                          >
+                            <TrashIcon className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Create Category Modal */}
+      {showCreateModal && (
+        <CategoryModal
+          onClose={() => setShowCreateModal(false)}
+          onSubmit={handleCreateCategory}
+          mode="create"
+        />
+      )}
+
+      {/* Edit Category Modal */}
+      {editingCategory && (
+        <CategoryModal
+          onClose={() => setEditingCategory(null)}
+          onSubmit={(data) => handleUpdateCategory(editingCategory.id, data)}
+          mode="edit"
+          category={editingCategory}
+        />
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <DeleteConfirmationModal
+          categoryName={categories.find(c => c.id === showDeleteModal)?.name || ''}
+          onConfirm={() => handleDeleteCategory(showDeleteModal)}
+          onCancel={() => setShowDeleteModal(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+// Category Modal Component
+interface CategoryModalProps {
+  onClose: () => void
+  onSubmit: (data: any) => Promise<void> | void
+  mode: 'create' | 'edit'
+  category?: BrandCategory
+}
+
+function CategoryModal({ onClose, onSubmit, mode, category }: CategoryModalProps) {
+  const [formData, setFormData] = useState({
+    name: category?.name || '',
+    description: category?.description || '',
+    icon: category?.icon || '',
+    color: category?.color || '#3B82F6'
+  })
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    onSubmit(formData)
+  }
+
+  return (
+    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+      <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div className="mt-3">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">
+            {mode === 'create' ? 'Create Category' : 'Edit Category'}
+          </h3>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Name</label>
+              <input
+                type="text"
+                required
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Description</label>
+              <textarea
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                rows={3}
+                className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Icon</label>
+              <input
+                type="text"
+                value={formData.icon}
+                onChange={(e) => setFormData({ ...formData, icon: e.target.value })}
+                placeholder="heroicon name"
+                className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Color</label>
+              <input
+                type="color"
+                value={formData.color}
+                onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                className="mt-1 block w-full h-10 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+              />
+            </div>
+            <div className="flex justify-end space-x-3 pt-4">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              >
+                {mode === 'create' ? 'Create' : 'Update'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Delete Confirmation Modal
+interface DeleteConfirmationModalProps {
+  categoryName: string
+  onConfirm: () => void
+  onCancel: () => void
+}
+
+function DeleteConfirmationModal({ categoryName, onConfirm, onCancel }: DeleteConfirmationModalProps) {
+  return (
+    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+      <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div className="mt-3 text-center">
+          <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
+            <TrashIcon className="h-6 w-6 text-red-600" />
+          </div>
+          <h3 className="text-lg font-medium text-gray-900 mt-4">Delete Category</h3>
+          <p className="text-sm text-gray-500 mt-2">
+            Are you sure you want to delete "{categoryName}"? This action cannot be undone.
+          </p>
+          <div className="flex justify-center space-x-3 mt-6">
+            <button
+              onClick={onCancel}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={onConfirm}
+              className="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}

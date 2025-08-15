@@ -17,6 +17,7 @@ import {
 } from './dto/signup.dto';
 import {
   MobileLoginDto,
+  MobilePasswordLoginDto,
   EmailLoginDto,
   OAuthLoginDto,
   RefreshTokenDto,
@@ -94,6 +95,12 @@ export class AuthController {
     return this.authService.mobileLogin(mobileLoginDto);
   }
 
+  @Post('login/mobile-password')
+  @HttpCode(HttpStatus.OK)
+  async mobilePasswordLogin(@Body() mobilePasswordLoginDto: MobilePasswordLoginDto) {
+    return this.authService.mobilePasswordLogin(mobilePasswordLoginDto);
+  }
+
   @Post('login/email')
   @HttpCode(HttpStatus.OK)
   async emailLogin(@Body() emailLoginDto: EmailLoginDto) {
@@ -161,5 +168,19 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async resetPassword(@Body() passwordResetDto: PasswordResetDto): Promise<PasswordResetResponse> {
     return this.authService.resetPassword(passwordResetDto);
+  }
+
+  // Admin Authentication Endpoints
+  @Post('admin/login')
+  @HttpCode(HttpStatus.OK)
+  async adminLogin(@Body() body: { email: string; password: string }) {
+    return this.authService.adminLogin(body.email, body.password);
+  }
+
+  @Post('admin/verify')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async adminVerify(@Request() req) {
+    return this.authService.adminVerify(req.user);
   }
 }

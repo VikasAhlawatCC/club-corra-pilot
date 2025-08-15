@@ -13,6 +13,8 @@ import { WelcomeBonusController } from './controllers/welcome-bonus.controller';
 import { WelcomeBonusService } from './services/welcome-bonus.service';
 import { TransactionValidationService } from './services/transaction-validation.service';
 import { BalanceUpdateService } from './services/balance-update.service';
+import { TransactionApprovalService } from './services/transaction-approval.service';
+import { PaymentProcessingService } from './services/payment-processing.service';
 import { CommonModule } from '../common/common.module';
 import { ConfigModule } from '../config/config.module';
 import { NotificationModule } from '../notifications/notification.module';
@@ -33,7 +35,7 @@ import { WebsocketModule } from '../websocket/websocket.module';
     // TransactionController,
     WelcomeBonusController,
   ],
-  providers: [CoinsService, WelcomeBonusService, TransactionValidationService, BalanceUpdateService],
-  exports: [CoinsService, WelcomeBonusService, TransactionValidationService, BalanceUpdateService],
+  providers: [CoinsService, WelcomeBonusService, TransactionValidationService, BalanceUpdateService, TransactionApprovalService, PaymentProcessingService],
+  exports: [CoinsService, WelcomeBonusService, TransactionValidationService, BalanceUpdateService, TransactionApprovalService, PaymentProcessingService],
 })
 export class CoinsModule {}

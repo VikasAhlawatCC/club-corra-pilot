@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CoinTransaction } from '../entities/coin-transaction.entity';
 import { CoinBalance } from '../entities/coin-balance.entity';
-// import { Brand } from '../../brands/entities/brand.entity';
+import { Brand } from '../../brands/entities/brand.entity';
 import { GlobalConfigService } from '../../config/services/global-config.service';
 
 export interface EarnRequestValidation {
@@ -35,8 +35,8 @@ export class TransactionValidationService {
     private readonly coinTransactionRepository: Repository<CoinTransaction>,
     @InjectRepository(CoinBalance)
     private readonly coinBalanceRepository: Repository<CoinBalance>,
-    // @InjectRepository(Brand)
-    // private readonly brandRepository: Repository<Brand>,
+    @InjectRepository(Brand)
+    private readonly brandRepository: Repository<Brand>,
     private readonly globalConfigService: GlobalConfigService,
   ) {}
 
@@ -85,47 +85,46 @@ export class TransactionValidationService {
       }
 
       // Validate brand exists and is active
-      // const brand = await this.brandRepository.findOne({ where: { id: validation.brandId } });
-      // if (!brand) {
-      //   errors.push('Brand not found');
-      // } else if (!brand.isActive) {
-      //   errors.push('Brand is not active');
-      // }
+      const brand = await this.brandRepository.findOne({ where: { id: validation.brandId } });
+      if (!brand) {
+        errors.push('Brand not found');
+      } else if (!brand.isActive) {
+        errors.push('Brand is not active');
+      }
 
       // Check brand earning caps
-      // if (brand) {
-      //   const userEarnedFromBrand = await this.coinTransactionRepository
-      //     .createQueryBuilder('transaction')
-      //     .select('SUM(transaction.coinsEarned)', 'totalEarned')
-      //     .where('transaction.userId = :userId', { userId: validation.userId })
-      //     .andWhere('transaction.brandId = :brandId', { brandId: validation.brandId })
-      //     .andWhere('transaction.type = :type', { type: 'EARN' })
-      //     .andWhere('transaction.status = :status', { status: 'APPROVED' })
-      //     .getRawOne();
+      if (brand) {
+        const userEarnedFromBrand = await this.coinTransactionRepository
+          .createQueryBuilder('transaction')
+          .select('SUM(transaction.coinsEarned)', 'totalEarned')
+          .where('transaction.userId = :userId', { userId: validation.userId })
+          .andWhere('transaction.brandId = :brandId', { brandId: validation.brandId })
+          .andWhere('transaction.type = :type', { type: 'EARN' })
+          .andWhere('transaction.status = :status', { status: 'APPROVED' })
+          .getRawOne();
 
-      //   const totalEarned = parseFloat(userEarnedFromBrand?.totalEarned || '0');
-      //   const brandwiseMaxCap = brand.brandwiseMaxCap || 2000;
+        const totalEarned = parseFloat(userEarnedFromBrand?.totalEarned || '0');
+        const brandwiseMaxCap = brand.brandwiseMaxCap || 2000;
 
-      //   if (totalEarned >= brandwiseMaxCap) {
-      //     errors.push(`You have reached the maximum earning cap for this brand (${brandwiseMaxCap} coins)`);
-      //   }
+        if (totalEarned >= brandwiseMaxCap) {
+          errors.push(`You have reached the maximum earning cap for this brand (${brandwiseMaxCap} coins)`);
+        }
 
-      //   // Check overall brand cap
-      //   const overallBrandEarnings = await this.coinTransactionRepository
-      //     .createQueryBuilder('transaction')
-      //     .select('SUM(transaction.coinsEarned)', 'totalEarned')
-      //     .where('transaction.brandId = :brandId', { brandId: validation.brandId })
-      //     .andWhere('transaction.type = :type', { type: 'EARN' })
-      //     .andWhere('transaction.status = :status', { status: 'APPROVED' })
-      //     .getRawOne();
+        // Check overall brand cap (if implemented)
+        // const overallBrandEarnings = await this.coinTransactionRepository
+        //   .createQueryBuilder('transaction')
+        //   .select('SUM(transaction.coinsEarned)', 'totalEarned')
+        //   .where('transaction.brandId = :brandId', { brandId: validation.brandId })
+        //   .andWhere('transaction.status = :status', { status: 'APPROVED' })
+        //   .getRawOne();
 
-      //   const overallEarned = parseFloat(overallBrandEarnings?.totalEarned || '0');
-      //   const overallMaxCap = brand.overallMaxCap || 2000;
+        // const overallEarned = parseFloat(overallBrandEarnings?.totalEarned || '0');
+        // const overallMaxCap = brand.overallMaxCap || 2000;
 
-      //   if (overallEarned >= overallMaxCap) {
-      //     errors.push(`This brand has reached its overall earning cap (${overallMaxCap} coins)`);
-      //   }
-      // }
+        // if (overallEarned >= overallMaxCap) {
+        //   errors.push(`This brand has reached its overall earning cap (${overallMaxCap} coins)`);
+        // }
+      }
 
     } catch (error) {
       this.logger.error(`Error validating earn request: ${error.message}`);
@@ -170,56 +169,175 @@ export class TransactionValidationService {
       }
 
       // Validate brand exists and is active
-      // const brand = await this.brandRepository.findOne({ where: { id: validation.brandId } });
-      // if (!brand) {
-      //   errors.push('Brand not found');
-      // } else if (!brand.isActive) {
-      //   errors.push('Brand is not active');
-      // }
+      const brand = await this.brandRepository.findOne({ where: { id: validation.brandId } });
+      if (!brand) {
+        errors.push('Brand not found');
+      } else if (!brand.isActive) {
+        errors.push('Brand is not active');
+      }
 
       // Check brand redemption caps
-      // if (brand) {
-      //   const userRedeemedFromBrand = await this.coinTransactionRepository
-      //     .createQueryBuilder('transaction')
-      //     .select('SUM(transaction.coinsRedeemed)', 'totalRedeemed')
-      //     .where('transaction.userId = :userId', { userId: validation.userId })
-      //     .andWhere('transaction.brandId = :brandId', { brandId: validation.brandId })
-      //     .where('transaction.type = :type', { type: 'REDEEM' })
-      //     .andWhere('transaction.status = :status', { status: 'APPROVED' })
-      //     .getRawOne();
+      if (brand) {
+        const userRedeemedFromBrand = await this.coinTransactionRepository
+          .createQueryBuilder('transaction')
+          .select('SUM(transaction.coinsRedeemed)', 'totalRedeemed')
+          .where('transaction.userId = :userId', { userId: validation.userId })
+          .andWhere('transaction.brandId = :brandId', { brandId: validation.brandId })
+          .andWhere('transaction.type = :type', { type: 'REDEEM' })
+          .andWhere('transaction.status = :status', { status: 'APPROVED' })
+          .getRawOne();
 
-      //   const totalRedeemed = parseFloat(userRedeemedFromBrand?.totalRedeemed || '0');
-      //   const brandwiseMaxCap = brand.brandwiseMaxCap || 2000;
+        const totalRedeemed = parseFloat(userRedeemedFromBrand?.totalRedeemed || '0');
+        const brandwiseMaxCap = brand.brandwiseMaxCap || 2000;
 
-      //   if (totalRedeemed >= brandwiseMaxCap) {
-      //     errors.push(`You have reached the maximum redemption cap for this brand (${brandwiseMaxCap} coins)`);
-      //   }
+        if (totalRedeemed >= brandwiseMaxCap) {
+          errors.push(`You have reached the maximum redemption cap for this brand (${brandwiseMaxCap} coins)`);
+        }
 
-      //   // Check overall brand cap
-      //   const overallBrandRedemptions = await this.coinTransactionRepository
-      //     .createQueryBuilder('transaction')
-      //     .select('SUM(transaction.coinsRedeemed)', 'totalRedeemed')
-      //     .where('transaction.brandId = :brandId', { brandId: validation.brandId })
-      //     .where('transaction.type = :type', { type: 'REDEEM' })
-      //     .select('transaction.status = :status', { status: 'APPROVED' })
-      //     .getRawOne();
+        // Check overall brand cap (if implemented)
+        // const overallBrandRedemptions = await this.coinTransactionRepository
+        //   .createQueryBuilder('transaction')
+        //   .select('SUM(transaction.coinsRedeemed)', 'totalRedeemed')
+        //   .where('transaction.brandId = :brandId', { brandId: validation.brandId })
+        //   .andWhere('transaction.type = :type', { type: 'REDEEM' })
+        //   .andWhere('transaction.status = :status', { status: 'APPROVED' })
+        //   .getRawOne();
 
-      //   const overallRedeemed = parseFloat(overallBrandRedemptions?.totalRedeemed || '0');
-      //   const overallMaxCap = brand.overallMaxCap || 2000;
+        // const overallRedeemed = parseFloat(overallBrandRedemptions?.totalRedeemed || '0');
+        // const overallMaxCap = brand.overallMaxCap || 2000;
 
-      //   if (overallRedeemed >= overallMaxCap) {
-      //     errors.push(`This brand has reached its overall redemption cap (${overallMaxCap} coins)`);
-      //   }
+        // if (overallRedeemed >= overallMaxCap) {
+        //   errors.push(`This brand has reached its overall redemption cap (${overallMaxCap} coins)`);
+        // }
 
-      //   // Validate redemption amount against brand percentage
-      //   const maxRedemptionAmount = (validation.billAmount * brand.redemptionPercentage) / 100;
-      //   if (validation.coinsToRedeem > maxRedemptionAmount) {
-      //     errors.push(`Maximum redemption amount for this bill is ${maxRedemptionAmount} coins (${brand.redemptionPercentage}% of bill amount)`);
-      //   }
-      // }
+        // Validate redemption amount against brand percentage
+        const maxRedemptionAmount = (validation.billAmount * brand.redemptionPercentage) / 100;
+        if (validation.coinsToRedeem > maxRedemptionAmount) {
+          errors.push(`Maximum redemption amount for this bill is ${maxRedemptionAmount} coins (${brand.redemptionPercentage}% of bill amount)`);
+        }
+      }
 
     } catch (error) {
       this.logger.error(`Error validating redeem request: ${error.message}`);
+      errors.push('Validation error occurred');
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors,
+      warnings,
+    };
+  }
+
+  /**
+   * Check if user has any pending earn requests
+   * This is used to validate that redeem requests can only be processed
+   * after all pending earn requests are resolved
+   */
+  async hasPendingEarnRequests(userId: string): Promise<boolean> {
+    try {
+      const pendingCount = await this.coinTransactionRepository.count({
+        where: {
+          userId,
+          type: 'EARN',
+          status: 'PENDING',
+        },
+      });
+
+      return pendingCount > 0;
+    } catch (error) {
+      this.logger.error(`Error checking pending earn requests: ${error.message}`);
+      return false;
+    }
+  }
+
+  /**
+   * Get count of pending earn requests for a user
+   */
+  async getPendingEarnRequestCount(userId: string): Promise<number> {
+    try {
+      return await this.coinTransactionRepository.count({
+        where: {
+          userId,
+          type: 'EARN',
+          status: 'PENDING',
+        },
+      });
+    } catch (error) {
+      this.logger.error(`Error getting pending earn request count: ${error.message}`);
+      return 0;
+    }
+  }
+
+  /**
+   * Get count of pending redeem requests for a user
+   */
+  async getPendingRedeemRequestCount(userId: string): Promise<number> {
+    try {
+      return await this.coinTransactionRepository.count({
+        where: {
+          userId,
+          type: 'REDEEM',
+          status: 'PENDING',
+        },
+      });
+    } catch (error) {
+      this.logger.error(`Error getting pending redeem request count: ${error.message}`);
+      return 0;
+    }
+  }
+
+  /**
+   * Validate that a redeem request can be processed
+   * - User must have no pending earn requests
+   * - User must have sufficient balance
+   * - Amount must be within brand limits
+   */
+  async canProcessRedeemRequest(
+    userId: string,
+    brandId: string,
+    amount: number,
+  ): Promise<ValidationResult> {
+    const errors: string[] = [];
+    const warnings: string[] = [];
+
+    try {
+      // Check for pending earn requests
+      const hasPendingEarn = await this.hasPendingEarnRequests(userId);
+      if (hasPendingEarn) {
+        errors.push('Cannot process redeem request. User has pending earn requests that must be processed first.');
+      }
+
+      // Check user balance
+      const userBalance = await this.coinBalanceRepository.findOne({
+        where: { userId },
+      });
+
+      if (!userBalance || userBalance.balance < amount) {
+        errors.push('Insufficient coin balance for redemption');
+      }
+
+      // Check brand limits
+      const brand = await this.brandRepository.findOne({
+        where: { id: brandId },
+      });
+
+      if (brand) {
+        if (amount < brand.minRedemptionAmount) {
+          errors.push(`Redemption amount must be at least ${brand.minRedemptionAmount} coins`);
+        }
+
+        if (amount > brand.maxRedemptionAmount) {
+          errors.push(`Redemption amount cannot exceed ${brand.maxRedemptionAmount} coins`);
+        }
+
+        if (amount > brand.brandwiseMaxCap) {
+          errors.push(`Redemption amount cannot exceed brand cap of ${brand.brandwiseMaxCap} coins`);
+        }
+      }
+
+    } catch (error) {
+      this.logger.error(`Error validating redeem request processing: ${error.message}`);
       errors.push('Validation error occurred');
     }
 

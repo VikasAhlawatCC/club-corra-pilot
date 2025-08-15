@@ -3,13 +3,15 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { useAuth } from '@/contexts/AuthContext'
 import { 
   HomeIcon, 
   BuildingStorefrontIcon, 
   CurrencyDollarIcon, 
   UsersIcon,
   ReceiptRefundIcon,
-  Cog6ToothIcon
+  Cog6ToothIcon,
+  ArrowRightOnRectangleIcon
 } from '@heroicons/react/24/outline'
 
 const navigation = [
@@ -23,6 +25,11 @@ const navigation = [
 
 export function AdminNavigation() {
   const pathname = usePathname()
+  const { user, logout } = useAuth()
+
+  const handleLogout = () => {
+    logout()
+  }
 
   return (
     <nav className="bg-white shadow-sm border-b">
@@ -53,8 +60,22 @@ export function AdminNavigation() {
               })}
             </div>
           </div>
-          <div className="flex items-center">
-            <span className="text-sm text-gray-500">Admin User</span>
+          <div className="flex items-center space-x-4">
+            {user && (
+              <>
+                <div className="text-right">
+                  <p className="text-sm font-medium text-gray-900">{user.name}</p>
+                  <p className="text-xs text-gray-500">{user.role}</p>
+                </div>
+                <button
+                  onClick={handleLogout}
+                  className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors"
+                >
+                  <ArrowRightOnRectangleIcon className="w-4 h-4 mr-2" />
+                  Logout
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>

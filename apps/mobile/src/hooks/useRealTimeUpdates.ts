@@ -9,7 +9,7 @@ import { useTransactionsStore } from '../stores/transactions.store';
  * the appropriate stores are updated automatically
  */
 export const useRealTimeUpdates = () => {
-  const { lastMessage } = useRealTime();
+  const { lastMessage, isConnected } = useRealTime();
   const { handleRealTimeUpdate: updateCoins } = useCoinsStore();
   const { handleRealTimeUpdate: updateTransactions } = useTransactionsStore();
 
@@ -32,4 +32,7 @@ export const useRealTimeUpdates = () => {
       }
     }
   }, [lastMessage, updateCoins, updateTransactions]);
+
+  // Return the connection status so other hooks can access it
+  return { isConnected };
 };

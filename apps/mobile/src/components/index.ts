@@ -1,11 +1,18 @@
-// Common Components
-export { default as Button } from './common/Button'
-export { default as Card } from './common/Card'
-export { default as Input } from './common/Input'
-export { default as Modal } from './common/Modal'
-export { default as LoadingSpinner } from './common/LoadingSpinner'
-export { default as ErrorMessage } from './common/ErrorMessage'
-export { RealTimeUpdates } from './RealTimeUpdates'
+export { Button } from './common/Button';
+export { Card } from './common/Card';
+export { Input } from './common/Input';
+export { Logo } from './common/Logo';
+export { Typography } from './common/Typography';
+export { WalletHero } from './common/WalletHero';
+export { WelcomeBonusPopup } from './common/WelcomeBonusPopup';
+export { LoadingSpinner } from './common/LoadingSpinner';
+export { SuccessAnimation } from './common/SuccessAnimation';
+export { ErrorAnimation } from './common/ErrorAnimation';
+export { WelcomeBonusAnimation } from './common/WelcomeBonusAnimation';
+export { WelcomeBonusDemo } from './common/WelcomeBonusDemo';
+export { default as FileUpload } from './common/FileUpload';
+export { default as DatePicker } from './common/DatePicker';
+export { default as Slider } from './common/Slider';
 
 // Transaction Screens
 export { default as EarnCoinsScreen } from '../screens/transactions/EarnCoinsScreen'

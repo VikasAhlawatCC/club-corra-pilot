@@ -46,6 +46,7 @@ interface AuthState {
   verifyOTP: (otp: string) => Promise<any>;
   resendOTP: () => Promise<any>;
   login: (mobileNumber: string, otp: string) => Promise<any>;
+  loginWithMobilePassword: (mobileNumber: string, password: string) => Promise<any>;
   sendLoginOTP: (mobileNumber: string) => Promise<any>;
   oauthSignup: (provider: 'GOOGLE', code: string, redirectUri: string) => Promise<any>;
   
@@ -353,6 +354,64 @@ export const useAuthStore = create<AuthState>()(
           return response;
         } catch (error) {
           console.error('Auth store: Login failed:', error);
+          throw error;
+        } finally {
+          set({ isLoading: false });
+        }
+      },
+
+      loginWithMobilePassword: async (mobileNumber: string, password: string) => {
+        set({ isLoading: true });
+        
+        try {
+          // First check if server is reachable
+          console.log('Auth store: Checking server health before login...');
+          const healthCheck = await authService.checkServerHealth();
+          
+          if (!healthCheck.isReachable) {
+            throw new Error(`Server is not accessible: ${healthCheck.message}. Please check your network connection and ensure the server is running.`);
+          }
+          
+          console.log('Auth store: Server is reachable, proceeding with login...');
+          console.log('Auth store: Calling authService.loginWithMobilePassword with:', { mobileNumber, password: '***' });
+          const response = await authService.loginWithMobilePassword(mobileNumber, password);
+          console.log('Auth store: Received response:', response);
+          console.log('Auth store: Response tokens:', response.tokens);
+          
+          // Store tokens securely
+          console.log('Auth store: Attempting to store tokens...');
+          await authService.storeTokens(response.tokens);
+          console.log('Auth store: Tokens stored successfully');
+          
+          set({ 
+            user: response.user, 
+            tokens: response.tokens, 
+            isAuthenticated: true,
+            currentMobileNumber: mobileNumber 
+          });
+          
+          return response;
+        } catch (error) {
+          console.error('Auth store: Mobile password login failed:', error);
+          
+          // Provide specific error messages for better user experience
+          if (error instanceof Error) {
+            if (error.message.includes('Network request failed')) {
+              throw new Error('Unable to connect to server. Please check your internet connection and ensure you\'re on the same network as the server.');
+            } else if (error.message.includes('Authentication failed')) {
+              throw new Error('Invalid mobile number or password. Please check your credentials and try again.');
+            } else if (error.message.includes('User not found')) {
+              throw new Error('No account found with this mobile number. Please sign up first.');
+            } else if (error.message.includes('Invalid password')) {
+              throw new Error('Incorrect password. Please try again or use OTP login.');
+            } else if (error.message.includes('Connection refused')) {
+              throw new Error('Server is not accessible. Please check if the server is running and try again.');
+            } else if (error.message.includes('Server is not accessible')) {
+              throw error; // This is our custom error from health check
+            } else {
+              throw error;
+            }
+          }
           throw error;
         } finally {
           set({ isLoading: false });
@@ -779,7 +838,30 @@ export const useAuthStore = create<AuthState>()(
             throw new Error('No mobile number found. Please start signup again.');
           }
           const response = await authService.newSetupPassword(passwordData);
-          if (response.user) {
+          
+          // Handle immediate account activation
+          if (response.accessToken && response.refreshToken) {
+            // Account is activated immediately, store tokens and update state
+            await authService.storeTokens({
+              accessToken: response.accessToken,
+              refreshToken: response.refreshToken,
+              expiresIn: response.expiresIn || 3600,
+              tokenType: 'Bearer',
+            });
+            
+            set({ 
+              user: response.user || get().user,
+              tokens: {
+                accessToken: response.accessToken,
+                refreshToken: response.refreshToken,
+                expiresIn: response.expiresIn || 3600,
+                tokenType: 'Bearer',
+              },
+              isAuthenticated: true,
+              currentMobileNumber: mobileNumber 
+            });
+          } else if (response.user) {
+            // Account not yet activated, just update user info
             const updatedUser = {
               ...response.user,
               hasPassword: true,
@@ -787,6 +869,7 @@ export const useAuthStore = create<AuthState>()(
             };
             set({ user: updatedUser });
           }
+          
           return response;
         } catch (error) {
           console.error('New password setup failed:', error);

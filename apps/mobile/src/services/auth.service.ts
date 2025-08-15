@@ -13,7 +13,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Normalize API base URL to include Nest global prefix `/api/v1`
-const RAW_API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.5:3001';
+const RAW_API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.4:3001';
 const API_BASE_URL = RAW_API_BASE_URL.endsWith('/api/v1')
   ? RAW_API_BASE_URL
   : `${RAW_API_BASE_URL.replace(/\/$/, '')}/api/v1`;
@@ -81,8 +81,20 @@ class AuthService {
         return this.makeRequest<T>(endpoint, options, retryCount + 1);
       }
       
-      // If we've exhausted retries or it's not a retryable error, throw
+      // If we've exhausted retries or it's not a retryable error, provide better error messages
       if (error instanceof Error) {
+        // Enhance error messages for common network issues
+        if (error.message.includes('Network request failed')) {
+          throw new Error('Network request failed. Please check your internet connection and ensure you\'re on the same network as the server.');
+        } else if (error.message.includes('fetch')) {
+          throw new Error('Unable to reach the server. Please check if the server is running and accessible from your device.');
+        } else if (error.message.includes('ECONNREFUSED')) {
+          throw new Error('Connection refused. The server is not accessible. Please check if the server is running.');
+        } else if (error.message.includes('ENOTFOUND')) {
+          throw new Error('Server not found. Please check the server address and try again.');
+        } else if (error.message.includes('ETIMEDOUT')) {
+          throw new Error('Request timed out. Please check your internet connection and try again.');
+        }
         throw error;
       }
       throw new Error('An unexpected error occurred');
@@ -478,6 +490,28 @@ class AuthService {
   }
 
   /**
+   * Login with mobile number and password
+   * @param mobileNumber - User's mobile number
+   * @param password - User's password
+   * @returns User data and authentication tokens
+   */
+  async loginWithMobilePassword(mobileNumber: string, password: string): Promise<{ user: User; tokens: AuthToken }> {
+    const payload = {
+      mobileNumber,
+      password,
+    };
+
+    const response = await this.makeRequest('login/mobile-password', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+
+    // Use type adapter to convert API response to shared types
+    const adaptedResponse = adaptApiAuthResponse(response);
+    return adaptedResponse;
+  }
+
+  /**
    * Login with OAuth provider
    * @param provider - OAuth provider (GOOGLE, FACEBOOK)
    * @param accessToken - OAuth access token
@@ -811,6 +845,62 @@ class AuthService {
       method: 'POST',
       body: JSON.stringify(emailData),
     });
+  }
+
+  /**
+   * Check if the server is reachable
+   * @returns Promise with server status
+   */
+  async checkServerHealth(): Promise<{ isReachable: boolean; message: string }> {
+    try {
+      // Use the base server URL (without /api/v1) for health check
+      const baseUrl = API_BASE_URL.replace('/api/v1', '');
+      const healthUrl = `${baseUrl}/api/v1/health`;
+      console.log('[DEBUG] Checking server health at:', healthUrl);
+      
+      const response = await fetch(healthUrl, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Platform': 'mobile',
+          'X-Client-Type': 'mobile',
+        },
+        // Short timeout for health check
+        signal: AbortSignal.timeout(5000),
+      });
+      
+      if (response.ok) {
+        // Check the response body status as well
+        try {
+          const healthData = await response.json();
+          if (healthData.status === 'ok' || healthData.status === 'error') {
+            // Even if status is 'error', the server is reachable
+            // The error might be due to missing S3 config, but core services are working
+            return { isReachable: true, message: 'Server is accessible' };
+          }
+        } catch (parseError) {
+          // If we can't parse the response, but HTTP is ok, server is reachable
+          return { isReachable: true, message: 'Server is accessible' };
+        }
+        return { isReachable: true, message: 'Server is accessible' };
+      } else {
+        return { isReachable: false, message: `Server responded with status ${response.status}` };
+      }
+    } catch (error) {
+      console.log('[DEBUG] Server health check failed:', error);
+      
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          return { isReachable: false, message: 'Server health check timed out' };
+        } else if (error.message.includes('Network request failed')) {
+          return { isReachable: false, message: 'Unable to reach server. Check your network connection.' };
+        } else if (error.message.includes('fetch')) {
+          return { isReachable: false, message: 'Server is not accessible from this device.' };
+        }
+      }
+      
+      return { isReachable: false, message: 'Unknown error occurred while checking server' };
+    }
   }
 
 }

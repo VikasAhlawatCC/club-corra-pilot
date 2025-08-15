@@ -4,34 +4,46 @@ import Constants from 'expo-constants';
 
 // Debug: Log all environment variables
 console.log('=== ENVIRONMENT DEBUG ===');
+console.log('Constants:', Constants);
+console.log('Constants.expoConfig:', Constants.expoConfig);
 console.log('Constants.extra:', Constants.expoConfig?.extra);
 console.log('API Base URL from Constants:', Constants.expoConfig?.extra?.apiBaseUrl);
 console.log('WS URL from Constants:', Constants.expoConfig?.extra?.wsUrl);
 console.log('========================');
 
 // Ensure base URLs include Nest global prefix `/api/v1`
-// For mobile devices, we need to use network IP, not localhost
+// Use the configuration from app.config.js
 const normalizeApiBase = (base?: string) => {
-  const raw = base || 'http://192.168.1.5:3001';
+  const raw = base || 'http://192.168.1.4:3001';
   return raw.endsWith('/api/v1') ? raw : `${raw.replace(/\/$/, '')}/api/v1`;
 };
 
-// For WebSocket connections, we need to use network IP when running on mobile devices
-// localhost only works when testing from the same machine
+// For WebSocket connections, use the base server URL (not the API endpoint)
 const normalizeWsUrl = (base?: string) => {
-  const raw = base || 'http://192.168.1.5:3001';
-  return raw.endsWith('/api/v1') ? raw : `${raw.replace(/\/$/, '')}/api/v1`;
+  const raw = base || 'http://192.168.1.4:3001';
+  // Remove /api/v1 if present, as WebSocket connects to base server
+  return raw.replace('/api/v1', '').replace(/\/$/, '');
+};
+
+// Safe access to Constants.expoConfig.extra
+const getExtraConfig = () => {
+  try {
+    return Constants.expoConfig?.extra || {};
+  } catch (error) {
+    console.log('Error accessing Constants.expoConfig.extra:', error);
+    return {};
+  }
 };
 
 export const environment = {
   // API Configuration
-  apiBaseUrl: normalizeApiBase(Constants.expoConfig?.extra?.apiBaseUrl),
+  apiBaseUrl: normalizeApiBase(getExtraConfig().apiBaseUrl),
   
   // WebSocket Configuration
-  wsUrl: normalizeWsUrl(Constants.expoConfig?.extra?.wsUrl),
+  wsUrl: normalizeWsUrl(getExtraConfig().wsUrl),
   
   // CDN Configuration
-  cdnUrl: process.env.EXPO_PUBLIC_CDN_URL || 'https://cdn.clubcorra.com',
+  cdnUrl: getExtraConfig().cdnUrl || 'https://cdn.clubcorra.com',
   
   // Sentry Configuration (for error monitoring)
   sentryDsn: process.env.EXPO_PUBLIC_SENTRY_DSN || '',
@@ -41,8 +53,8 @@ export const environment = {
   enableCrashReporting: process.env.EXPO_PUBLIC_ENABLE_CRASH_REPORTING === 'true',
   
   // Development Configuration
-  environment: process.env.EXPO_PUBLIC_ENVIRONMENT || 'development',
-  debugMode: process.env.EXPO_PUBLIC_DEBUG_MODE === 'true',
+  environment: getExtraConfig().environment || 'development',
+  debugMode: getExtraConfig().debugMode || false,
   
   // App Configuration
   appName: 'Club Corra',

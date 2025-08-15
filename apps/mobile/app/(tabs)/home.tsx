@@ -1,35 +1,91 @@
-import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Modal, Image, RefreshControl, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { colors, spacing, borderRadius, typography, shadows, glassEffects } from '@/styles/theme';
+import { WelcomeBonusAnimation } from '@/components/common';
+import { useWelcomeBonus } from '@/hooks/useWelcomeBonus';
+import { useBrandsStore } from '@/stores/brands.store';
+import { useCoinBalance } from '@/hooks/useCoinBalance';
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { shouldShowAnimation, markWelcomeBonusAsShown } = useWelcomeBonus();
+  const [showWelcomeModal, setShowWelcomeModal] = useState(false);
+  
+  const { brands, fetchBrands, isLoading: brandsLoading } = useBrandsStore();
+  const { balance, totalEarned, totalRedeemed, refreshBalance, isRefreshing } = useCoinBalance();
+
+  useEffect(() => {
+    try {
+      if (shouldShowAnimation === true) {
+        setShowWelcomeModal(true);
+      } else {
+        setShowWelcomeModal(false);
+      }
+    } catch (error) {
+      console.error('Error in welcome animation useEffect:', error);
+      setShowWelcomeModal(false);
+    }
+  }, [shouldShowAnimation]);
+
+  // Fetch brands and balance on mount
+  useEffect(() => {
+    try {
+      if (typeof fetchBrands === 'function') {
+        fetchBrands();
+      }
+      if (typeof refreshBalance === 'function') {
+        refreshBalance();
+      }
+    } catch (error) {
+      console.error('Error in home screen mount useEffect:', error);
+    }
+  }, [fetchBrands, refreshBalance]);
 
   const handleEarnCoins = () => {
-    router.push('/transactions/earn');
+    try {
+      router.push('/transactions/earn');
+    } catch (error) {
+      console.error('Error navigating to earn coins:', error);
+    }
   };
 
   const handleRedeemCoins = () => {
-    router.push('/transactions/redeem');
+    try {
+      router.push('/transactions/redeem');
+    } catch (error) {
+      console.error('Error navigating to redeem coins:', error);
+    }
   };
 
   const handleBrandPress = (brand: any) => {
-    router.push('/transactions/earn');
+    try {
+      if (brand?.id) {
+        router.push(`/brands/${brand.id}`);
+      } else {
+        console.warn('Brand object is missing ID:', brand);
+      }
+    } catch (error) {
+      console.error('Error navigating to brand:', error);
+    }
   };
 
-  // Mock data for demonstration
-  const partnerBrands = [
-    { id: 1, name: "Domino's", initial: "D", color: "#0055cc" },
-    { id: 2, name: "IndiGo", initial: "I", color: "#3a3d98" },
-    { id: 3, name: "H&M", initial: "H", color: "#e51b24" },
-    { id: 4, name: "Starbucks", initial: "S", color: "#006241" },
-    { id: 5, name: "Titan", initial: "T", color: "#7a2d2d" },
-    { id: 6, name: "bigbasket", initial: "b", color: "#5b8c00" },
-  ];
+  const handleWelcomeAnimationComplete = () => {
+    try {
+      // Mark welcome bonus as shown and close modal
+      markWelcomeBonusAsShown();
+      setShowWelcomeModal(false);
+    } catch (error) {
+      console.error('Error handling welcome animation complete:', error);
+      setShowWelcomeModal(false);
+    }
+  };
+
+  // Use real brands from API with safety checks
+  const partnerBrands = Array.isArray(brands) ? brands.filter(brand => brand?.isActive === true) : [];
 
   return (
     <SafeAreaView style={styles.container}>
@@ -41,6 +97,14 @@ export default function HomeScreen() {
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={refreshBalance}
+              colors={[colors.gold[500]]}
+              tintColor={colors.gold[500]}
+            />
+          }
         >
           {/* Elite Header */}
           <View style={styles.header}>
@@ -61,16 +125,16 @@ export default function HomeScreen() {
                 <Text style={styles.balanceLabel}>Your Balance</Text>
                 <Ionicons name="wallet" size={24} color={colors.gold[700]} />
               </View>
-              <Text style={styles.balanceAmount}>100</Text>
+              <Text style={styles.balanceAmount}>{balance || 0}</Text>
               <Text style={styles.balanceCurrency}>Corra Coins</Text>
               <View style={styles.balanceStats}>
                 <View style={styles.statItem}>
-                  <Text style={styles.statValue}>100</Text>
+                  <Text style={styles.statValue}>{totalEarned || 0}</Text>
                   <Text style={styles.statLabel}>Total Earned</Text>
                 </View>
                 <View style={styles.statDivider} />
                 <View style={styles.statItem}>
-                  <Text style={styles.statValue}>0</Text>
+                  <Text style={styles.statValue}>{totalRedeemed || 0}</Text>
                   <Text style={styles.statLabel}>Total Redeemed</Text>
                 </View>
               </View>
@@ -112,52 +176,87 @@ export default function HomeScreen() {
             <Text style={styles.sectionTitle}>Partner Brands</Text>
             <Text style={styles.sectionSubtitle}>Tap to earn or redeem coins</Text>
             
-            <View style={styles.brandsGrid}>
-              {partnerBrands.map((brand) => (
+            {brandsLoading ? (
+              <View style={styles.brandsLoading}>
+                <ActivityIndicator size="large" color={colors.gold[500]} />
+                <Text style={styles.brandsLoadingText}>Loading brands...</Text>
+              </View>
+            ) : partnerBrands.length === 0 ? (
+              <View style={styles.brandsEmpty}>
+                <Ionicons name="storefront-outline" size={48} color={colors.gray[400]} />
+                <Text style={styles.brandsEmptyText}>No brands available</Text>
+                <Text style={styles.brandsEmptySubtext}>Check back later for partner brands</Text>
+              </View>
+            ) : (
+              <View style={styles.brandsGrid}>
+                {partnerBrands.map((brand) => (
                 <TouchableOpacity
                   key={brand.id}
                   style={styles.brandCard}
                   onPress={() => handleBrandPress(brand)}
                   activeOpacity={0.8}
                 >
-                  <View style={styles.brandIcon}>
-                    <Text style={styles.brandInitial}>{brand.initial}</Text>
-                  </View>
+                  {brand.logoUrl ? (
+                    <Image source={{ uri: brand.logoUrl }} style={styles.brandLogo} />
+                  ) : (
+                    <View style={styles.brandIcon}>
+                      <Text style={styles.brandInitial}>{brand.name.charAt(0).toUpperCase()}</Text>
+                    </View>
+                  )}
                   <Text style={styles.brandName}>{brand.name}</Text>
                   <View style={styles.brandInfo}>
-                    <Text style={styles.brandPercentage}>30% back</Text>
-                    <Text style={styles.brandPercentage}>100% off</Text>
+                    <Text style={styles.brandPercentage}>{brand.earningPercentage}% earn</Text>
+                    <Text style={styles.brandPercentage}>{brand.redemptionPercentage}% redeem</Text>
                   </View>
                 </TouchableOpacity>
               ))}
-            </View>
+              </View>
+            )}
           </View>
 
-          {/* Welcome Bonus Section */}
-          <View style={styles.bonusSection}>
-            <View style={styles.bonusCard}>
-              <View style={styles.bonusIcon}>
-                <Ionicons name="star" size={32} color={colors.gold[700]} />
+          {/* Welcome Bonus Section - Only show if animation hasn't been shown */}
+          {!shouldShowAnimation && (
+            <View style={styles.bonusSection}>
+              <View style={styles.bonusCard}>
+                <View style={styles.bonusIcon}>
+                  <Ionicons name="star" size={32} color={colors.gold[700]} />
+                </View>
+                <Text style={styles.bonusTitle}>🎉 Welcome Bonus!</Text>
+                <Text style={styles.bonusDescription}>
+                  You've earned 100 coins for joining Club Corra. Start earning more by uploading your first bill!
+                </Text>
+                <TouchableOpacity 
+                  style={styles.bonusButton}
+                  onPress={handleEarnCoins}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.bonusButtonText}>Upload Bill</Text>
+                </TouchableOpacity>
               </View>
-              <Text style={styles.bonusTitle}>🎉 Welcome Bonus!</Text>
-              <Text style={styles.bonusDescription}>
-                You've earned 100 coins for joining Club Corra. Start earning more by uploading your first bill!
-              </Text>
-              <TouchableOpacity 
-                style={styles.bonusButton}
-                onPress={handleEarnCoins}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.bonusButtonText}>Upload Bill</Text>
-              </TouchableOpacity>
+            </View>
+          )}
+        </ScrollView>
+
+        {/* Welcome Bonus Animation Modal */}
+        <Modal
+          visible={showWelcomeModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowWelcomeModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <WelcomeBonusAnimation
+                isVisible={showWelcomeModal}
+                onAnimationComplete={handleWelcomeAnimationComplete}
+              />
             </View>
           </View>
-        </ScrollView>
+        </Modal>
       </LinearGradient>
     </SafeAreaView>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -384,6 +483,39 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.regular,
     marginTop: spacing[1],
   },
+  brandLogo: {
+    width: 64,
+    height: 64,
+    borderRadius: borderRadius.full,
+    marginBottom: spacing[2],
+    ...shadows.md,
+  },
+  brandsLoading: {
+    alignItems: 'center',
+    paddingVertical: spacing[8],
+  },
+  brandsLoadingText: {
+    fontSize: typography.fontSize.md,
+    color: colors.text.secondary,
+    marginTop: spacing[3],
+    fontFamily: typography.fontFamily.medium,
+  },
+  brandsEmpty: {
+    alignItems: 'center',
+    paddingVertical: spacing[8],
+  },
+  brandsEmptyText: {
+    fontSize: typography.fontSize.md,
+    color: colors.text.secondary,
+    marginTop: spacing[3],
+    fontFamily: typography.fontFamily.medium,
+  },
+  brandsEmptySubtext: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.secondary,
+    marginTop: spacing[1],
+    fontFamily: typography.fontFamily.regular,
+  },
 
   // Bonus Section
   bonusSection: {
@@ -435,4 +567,20 @@ const styles = StyleSheet.create({
     color: colors.text.dark,
     fontFamily: typography.fontFamily.semiBold,
   },
+
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.7)',
+  },
+  modalContent: {
+    width: '90%',
+    height: '90%',
+    backgroundColor: 'transparent',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 });
+

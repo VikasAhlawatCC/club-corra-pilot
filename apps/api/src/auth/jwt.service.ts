@@ -15,11 +15,15 @@ export class JwtTokenService {
    * Ensures consistent token structure across platforms
    */
   generateTokens(user: any) {
+    // Check if user is an admin
+    const isAdmin = user.role && (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN');
+    
     const payload: JwtPayload = {
       sub: user.id,
       mobileNumber: user.mobileNumber,
       email: user.email,
-      roles: ['user'],
+      roles: isAdmin ? [] : ['user'],
+      role: isAdmin ? user.role : undefined,
       iat: Math.floor(Date.now() / 1000),
       exp: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60), // 7 days
     };
@@ -44,11 +48,15 @@ export class JwtTokenService {
    * Generates mobile-specific tokens with longer expiry
    */
   generateMobileTokens(user: any) {
+    // Check if user is an admin
+    const isAdmin = user.role && (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN');
+    
     const payload: JwtPayload = {
       sub: user.id,
       mobileNumber: user.mobileNumber,
       email: user.email,
-      roles: ['user'],
+      roles: isAdmin ? [] : ['user'],
+      role: isAdmin ? user.role : undefined,
       iat: Math.floor(Date.now() / 1000),
       exp: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60), // 7 days
     };
@@ -73,11 +81,15 @@ export class JwtTokenService {
    * Generates web-specific tokens with shorter expiry
    */
   generateWebTokens(user: any) {
+    // Check if user is an admin
+    const isAdmin = user.role && (user.role === 'SUPER_ADMIN' || user.role === 'ADMIN');
+    
     const payload: JwtPayload = {
       sub: user.id,
       mobileNumber: user.mobileNumber,
       email: user.email,
-      roles: ['user'],
+      roles: isAdmin ? [] : ['user'],
+      role: isAdmin ? user.role : undefined,
       iat: Math.floor(Date.now() / 1000),
       exp: Math.floor(Date.now() / 1000) + (24 * 60 * 60), // 24 hours
     };

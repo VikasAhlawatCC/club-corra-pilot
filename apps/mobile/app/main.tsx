@@ -1,13 +1,16 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { Button, Card } from '@/components/common';
+import { Button, Card, WelcomeBonusAnimation } from '@/components/common';
 import { colors, spacing, borderRadius, typography, shadows, glassEffects } from '@/styles/theme';
 
 export default function MainScreen() {
+  const [showAnimation, setShowAnimation] = useState(true);
+  const [animationComplete, setAnimationComplete] = useState(false);
+
   const handleGoToHome = () => {
     // Navigate to main app home
     router.replace('/(tabs)/home');
@@ -18,89 +21,105 @@ export default function MainScreen() {
     Alert.alert('Learn More', 'This will navigate to learning screens');
   };
 
+  const handleAnimationComplete = () => {
+    setAnimationComplete(true);
+    setShowAnimation(false);
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <LinearGradient
         colors={[colors.background.dark[900], colors.background.dark[800]]}
         style={styles.gradient}
       >
-        <ScrollView 
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Elite Header */}
-          <View style={styles.header}>
-            <View style={styles.logoContainer}>
-              <View style={styles.logoCircle}>
-                <Text style={styles.logoText}>CC</Text>
-              </View>
-              <View style={styles.appNameContainer}>
-                <Text style={styles.appName}>Club Corra</Text>
-              </View>
-            </View>
-          </View>
-
-          {/* Welcome Message */}
-          <View style={styles.welcomeSection}>
-            <View style={styles.welcomeHeader}>
-              <Text style={styles.welcomeTitle}>Welcome to Club Corra!</Text>
-              <View style={styles.celebrationIcon}>
-                <Ionicons name="sparkles" size={24} color={colors.gold[700]} />
-              </View>
-            </View>
-            <Text style={styles.welcomeSubtitle}>
-              Your account has been created successfully. You've earned 100 Corra Coins as a welcome bonus!
-            </Text>
-          </View>
-
-          {/* Corra Coins Bonus Card */}
-          <Card variant="elevated" padding={8} style={styles.bonusCard}>
-            <View style={styles.coinIconContainer}>
-              <View style={styles.coinIcon}>
-                <Ionicons name="business" size={32} color={colors.text.dark} />
-              </View>
-            </View>
-            <Text style={styles.coinAmount}>100 Corra Coins</Text>
-            <Text style={styles.bonusText}>Welcome Bonus Added to Your Account</Text>
-          </Card>
-
-          {/* Action Buttons */}
-          <View style={styles.actionButtons}>
-            <Button
-              title="Go to Home"
-              onPress={handleGoToHome}
-              variant="primary"
-              size="large"
-              fullWidth
-              style={styles.primaryButton}
-            />
-            
-            <Button
-              title="Learn How to Earn More"
-              onPress={handleLearnMore}
-              variant="secondary"
-              size="large"
-              fullWidth
-              style={styles.secondaryButton}
+        {showAnimation ? (
+          // Show welcome bonus animation first
+          <View style={styles.animationContainer}>
+            <WelcomeBonusAnimation
+              isVisible={showAnimation}
+              onAnimationComplete={handleAnimationComplete}
             />
           </View>
+        ) : (
+          // Show regular content after animation
+          <ScrollView 
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Elite Header */}
+            <View style={styles.header}>
+              <View style={styles.logoContainer}>
+                <View style={styles.logoCircle}>
+                  <Text style={styles.logoText}>CC</Text>
+                </View>
+                <View style={styles.appNameContainer}>
+                  <Text style={styles.appName}>Club Corra</Text>
+                </View>
+              </View>
+            </View>
 
-          {/* Quick Info */}
-          <View style={styles.quickInfo}>
-            <View style={styles.infoItem}>
-              <Ionicons name="star" size={20} color={colors.gold[700]} />
-              <Text style={styles.infoText}>Start earning coins with every purchase</Text>
+            {/* Welcome Message */}
+            <View style={styles.welcomeSection}>
+              <View style={styles.welcomeHeader}>
+                <Text style={styles.welcomeTitle}>Welcome to Club Corra!</Text>
+                <View style={styles.celebrationIcon}>
+                  <Ionicons name="sparkles" size={24} color={colors.gold[700]} />
+                </View>
+              </View>
+              <Text style={styles.welcomeSubtitle}>
+                Your account has been created successfully. You've earned 100 Corra Coins as a welcome bonus!
+              </Text>
             </View>
-            <View style={styles.infoItem}>
-              <Ionicons name="gift" size={20} color={colors.gold[700]} />
-              <Text style={styles.infoText}>Redeem coins for cashbacks & rewards</Text>
+
+            {/* Corra Coins Bonus Card */}
+            <Card variant="elevated" padding={8} style={styles.bonusCard}>
+              <View style={styles.coinIconContainer}>
+                <View style={styles.coinIcon}>
+                  <Ionicons name="business" size={32} color={colors.text.dark} />
+                </View>
+              </View>
+              <Text style={styles.coinAmount}>100 Corra Coins</Text>
+              <Text style={styles.bonusText}>Welcome Bonus Added to Your Account</Text>
+            </Card>
+
+            {/* Action Buttons */}
+            <View style={styles.actionButtons}>
+              <Button
+                title="Go to Home"
+                onPress={handleGoToHome}
+                variant="primary"
+                size="large"
+                fullWidth
+                style={styles.primaryButton}
+              />
+              
+              <Button
+                title="Learn How to Earn More"
+                onPress={handleLearnMore}
+                variant="secondary"
+                size="large"
+                fullWidth
+                style={styles.secondaryButton}
+              />
             </View>
-            <View style={styles.infoItem}>
-              <Ionicons name="trending-up" size={20} color={colors.gold[700]} />
-              <Text style={styles.infoText}>Exclusive member benefits & offers</Text>
+
+            {/* Quick Info */}
+            <View style={styles.quickInfo}>
+              <View style={styles.infoItem}>
+                <Ionicons name="star" size={20} color={colors.gold[700]} />
+                <Text style={styles.infoText}>Start earning coins with every purchase</Text>
+              </View>
+              <View style={styles.infoItem}>
+                <Ionicons name="gift" size={20} color={colors.gold[700]} />
+                <Text style={styles.infoText}>Redeem coins for cashbacks & rewards</Text>
+              </View>
+              <View style={styles.infoItem}>
+                <Ionicons name="trending-up" size={20} color={colors.gold[700]} />
+                <Text style={styles.infoText}>Exclusive member benefits & offers</Text>
+              </View>
             </View>
-          </View>
-        </ScrollView>
+          </ScrollView>
+        )}
       </LinearGradient>
     </SafeAreaView>
   );
@@ -113,6 +132,11 @@ const styles = StyleSheet.create({
   },
   gradient: {
     flex: 1,
+  },
+  animationContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   scrollContent: {
     flexGrow: 1,

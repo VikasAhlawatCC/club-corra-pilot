@@ -1,12 +1,13 @@
 import { Controller, Get, Post, Put, Body, Param, Query, UseGuards, Logger } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { AdminGuard } from '../../auth/guards/admin.guard';
 import { CoinsService } from '../coins.service';
 import { WelcomeBonusDto } from '../dto/welcome-bonus.dto';
 import { NotificationService } from '../../notifications/notification.service';
 import { ConnectionManager } from '../../websocket/connection.manager';
 
 @Controller('admin/coins')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, AdminGuard)
 export class CoinAdminController {
   private readonly logger = new Logger(CoinAdminController.name);
 
@@ -128,18 +129,30 @@ export class CoinAdminController {
   }
 
   @Get('transactions/pending')
-  async getPendingTransactions() {
+  async getPendingTransactions(
+    @Query('page') page = 1,
+    @Query('limit') limit = 20,
+    @Query('type') type?: 'EARN' | 'REDEEM',
+  ) {
     try {
-      // For now, return empty result - could implement pending transaction listing later
+      const result = await this.coinsService.getPendingTransactions(
+        parseInt(page.toString()),
+        parseInt(limit.toString()),
+        type,
+      );
+      
+      // Transform the result to match frontend expectations
+      const totalPages = Math.ceil(result.total / limit);
+      
       return {
         success: true,
-        message: 'Pending transactions listing not implemented yet',
+        message: 'Pending transactions retrieved successfully',
         data: {
-          data: [],
-          total: 0,
-          page: 1,
-          limit: 20,
-          totalPages: 0,
+          data: result.transactions,
+          total: result.total,
+          page: parseInt(page.toString()),
+          limit: parseInt(limit.toString()),
+          totalPages,
         },
       };
     } catch (error) {
@@ -149,13 +162,21 @@ export class CoinAdminController {
   }
 
   @Put('transactions/:id/approve')
-  async approveTransaction(@Param('id') id: string, @Body() approveDto: any) {
+  async approveTransaction(
+    @Param('id') id: string,
+    @Body() approveDto: { adminNotes?: string; adminUserId: string },
+  ) {
     try {
-      // For now, return not implemented - could implement transaction approval later
+      const transaction = await this.coinsService.approveEarnTransaction(
+        id,
+        approveDto.adminUserId,
+        approveDto.adminNotes,
+      );
+      
       return {
-        success: false,
-        message: 'Transaction approval not implemented yet',
-        data: null,
+        success: true,
+        message: 'Transaction approved successfully',
+        data: { transaction },
       };
     } catch (error) {
       this.logger.error(`Failed to approve transaction ${id}: ${error.message}`);
@@ -164,13 +185,21 @@ export class CoinAdminController {
   }
 
   @Put('transactions/:id/reject')
-  async rejectTransaction(@Param('id') id: string, @Body() rejectDto: any) {
+  async rejectTransaction(
+    @Param('id') id: string,
+    @Body() rejectDto: { adminNotes: string; adminUserId: string },
+  ) {
     try {
-      // For now, return not implemented - could implement transaction rejection later
+      const transaction = await this.coinsService.rejectEarnTransaction(
+        id,
+        rejectDto.adminUserId,
+        rejectDto.adminNotes,
+      );
+      
       return {
-        success: false,
-        message: 'Transaction rejection not implemented yet',
-        data: null,
+        success: true,
+        message: 'Transaction rejected successfully',
+        data: { transaction },
       };
     } catch (error) {
       this.logger.error(`Failed to reject transaction ${id}: ${error.message}`);
@@ -179,16 +208,133 @@ export class CoinAdminController {
   }
 
   @Put('transactions/:id/process-payment')
-  async processPayment(@Param('id') id: string, @Body() processPaymentDto: any) {
+  async processPayment(
+    @Param('id') id: string,
+    @Body() processPaymentDto: {
+      adminUserId: string;
+      paymentTransactionId: string;
+      paymentMethod: string;
+      paymentAmount: number;
+      adminNotes?: string;
+    },
+  ) {
     try {
-      // For now, return not implemented - could implement payment processing later
+      const transaction = await this.coinsService.processPayment(
+        id,
+        processPaymentDto.adminUserId,
+        processPaymentDto.paymentTransactionId,
+        processPaymentDto.paymentMethod,
+        processPaymentDto.paymentAmount,
+        processPaymentDto.adminNotes,
+      );
+      
       return {
-        success: false,
-        message: 'Payment processing not implemented yet',
-        data: null,
+        success: true,
+        message: 'Payment processed successfully',
+        data: { transaction },
       };
     } catch (error) {
       this.logger.error(`Failed to process payment for transaction ${id}: ${error.message}`);
+      throw error;
+    }
+  }
+
+  @Put('transactions/:id/approve-redeem')
+  async approveRedeemTransaction(
+    @Param('id') id: string,
+    @Body() approveDto: { adminNotes?: string; adminUserId: string },
+  ) {
+    try {
+      const transaction = await this.coinsService.approveRedeemTransaction(
+        id,
+        approveDto.adminUserId,
+        approveDto.adminNotes,
+      );
+      
+      return {
+        success: true,
+        message: 'Redeem transaction approved successfully',
+        data: { transaction },
+      };
+    } catch (error) {
+      this.logger.error(`Failed to approve redeem transaction ${id}: ${error.message}`);
+      throw error;
+    }
+  }
+
+  @Put('transactions/:id/reject-redeem')
+  async rejectRedeemTransaction(
+    @Param('id') id: string,
+    @Body() rejectDto: { adminNotes: string; adminUserId: string },
+  ) {
+    try {
+      const transaction = await this.coinsService.rejectRedeemTransaction(
+        id,
+        rejectDto.adminUserId,
+        rejectDto.adminNotes,
+      );
+      
+      return {
+        success: true,
+        message: 'Redeem transaction rejected successfully',
+        data: { transaction },
+      };
+    } catch (error) {
+      this.logger.error(`Failed to reject redeem transaction ${id}: ${error.message}`);
+      throw error;
+    }
+  }
+
+  @Get('stats/transactions')
+  async getTransactionStats() {
+    try {
+      const stats = await this.coinsService.getTransactionStats();
+      
+      return {
+        success: true,
+        message: 'Transaction statistics retrieved successfully',
+        data: stats,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to get transaction stats: ${error.message}`);
+      throw error;
+    }
+  }
+
+  @Get('stats/payments')
+  async getPaymentStats(
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    try {
+      const start = startDate ? new Date(startDate) : undefined;
+      const end = endDate ? new Date(endDate) : undefined;
+      
+      const stats = await this.coinsService.getPaymentStats(start, end);
+      
+      return {
+        success: true,
+        message: 'Payment statistics retrieved successfully',
+        data: stats,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to get payment stats: ${error.message}`);
+      throw error;
+    }
+  }
+
+  @Get('payments/:transactionId/summary')
+  async getPaymentSummary(@Param('transactionId') transactionId: string) {
+    try {
+      const summary = await this.coinsService.getPaymentSummary(transactionId);
+      
+      return {
+        success: true,
+        message: 'Payment summary retrieved successfully',
+        data: summary,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to get payment summary for ${transactionId}: ${error.message}`);
       throw error;
     }
   }

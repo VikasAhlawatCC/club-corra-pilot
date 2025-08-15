@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,28 +7,26 @@ import {
   Alert,
   ActivityIndicator,
   TextInput,
-  Image,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import DateTimePicker from '@react-native-community/datetimepicker';
-import * as ImagePicker from 'expo-image-picker';
 
 import { useTransactionsStore } from '../../stores/transactions.store';
 import { useBrandsStore } from '../../stores/brands.store';
 import { useAuthStore } from '../../stores/auth.store';
 import { fileUploadService } from '../../services/file-upload.service';
-import { colors, typography, spacing } from '../../styles/theme';
+import { colors, typography, spacing, borderRadius } from '../../styles/theme';
 import { createEarnTransactionSchema } from '@shared/schemas';
+import { FileUpload, DatePicker, Input } from '../../components/common';
 
 type EarnFormData = z.infer<typeof createEarnTransactionSchema>;
 
 export default function EarnCoinsScreen() {
   const router = useRouter();
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [selectedImage, setSelectedImage] = useState<any>(null);
+  const { brandId } = useLocalSearchParams<{ brandId?: string }>();
+  const [selectedFile, setSelectedFile] = useState<any>(null);
   const [isUploading, setIsUploading] = useState(false);
   
   const { submitEarnRequest, isSubmitting, error, clearError } = useTransactionsStore();
@@ -46,9 +44,9 @@ export default function EarnCoinsScreen() {
     resolver: zodResolver(createEarnTransactionSchema),
     defaultValues: {
       userId: user?.id || '',
-      brandId: '',
+      brandId: brandId || '',
       billAmount: 0,
-      billDate: new Date().toISOString().split('T')[0], // Format as YYYY-MM-DD
+      billDate: new Date(),
       receiptUrl: '',
       notes: '',
     },
@@ -59,82 +57,46 @@ export default function EarnCoinsScreen() {
   const selectedBrand = brands.find(b => b.id === watchedBrandId);
 
   // Fetch brands on mount
-  React.useEffect(() => {
+  useEffect(() => {
     fetchBrands();
   }, [fetchBrands]);
 
+  // Set brandId from params when available
+  useEffect(() => {
+    if (brandId) {
+      setValue('brandId', brandId);
+    }
+  }, [brandId, setValue]);
+
   // Clear error when component unmounts
-  React.useEffect(() => {
+  useEffect(() => {
     return () => clearError();
   }, [clearError]);
 
-  const validateFile = (file: any) => {
-    const maxSize = 5 * 1024 * 1024; // 5MB
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg'];
-    
-    if (file.size > maxSize) {
-      throw new Error('File size must be less than 5MB');
-    }
-    
-    if (!allowedTypes.includes(file.type)) {
-      throw new Error('Only JPEG and PNG files are allowed');
-    }
+  const handleFileSelect = (file: any) => {
+    setSelectedFile(file);
   };
 
-  const handleImagePick = async () => {
-    try {
-      // Request permissions
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission needed', 'Please grant permission to access your photo library');
-        return;
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [4, 3],
-        quality: 0.8,
-      });
-      
-      if (!result.canceled && result.assets[0]) {
-        const asset = result.assets[0];
-        setSelectedImage(asset);
-        
-        // Validate file
-        try {
-          validateFile({
-            size: asset.fileSize || 0,
-            type: asset.type || 'image/jpeg'
-          });
-        } catch (validationError) {
-          Alert.alert('Invalid File', validationError instanceof Error ? validationError.message : 'File validation failed');
-          setSelectedImage(null);
-          return;
-        }
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Failed to pick image');
-      console.error('Image picker error:', error);
-    }
+  const handleFileRemove = () => {
+    setSelectedFile(null);
   };
 
-  const uploadImage = async (): Promise<string> => {
-    if (!selectedImage) {
-      throw new Error('No image selected');
+  const uploadFile = async (): Promise<string> => {
+    if (!selectedFile) {
+      throw new Error('No file selected');
     }
 
     setIsUploading(true);
     try {
       // Get upload URL from backend
       const uploadUrl = await fileUploadService.getUploadUrl({
-        fileName: `receipt_${Date.now()}.jpg`,
-        fileType: selectedImage.type || 'image/jpeg',
-        fileSize: selectedImage.fileSize || 0,
+        fileName: selectedFile.name || `receipt_${Date.now()}.${selectedFile.type === 'application/pdf' ? 'pdf' : 'jpg'}`,
+        fileType: selectedFile.type,
+        fileSize: selectedFile.size,
       });
 
-      // Convert image to blob for upload
-      const response = await fetch(selectedImage.uri);
+      // Convert file to blob for upload
+      const response = await fetch(selectedFile.uri);
       const blob = await response.blob();
 
       // Upload to S3
@@ -154,18 +116,19 @@ export default function EarnCoinsScreen() {
 
   const onSubmit = async (data: EarnFormData) => {
     try {
-      if (!selectedImage) {
-        Alert.alert('Error', 'Please select a receipt image');
+      if (!selectedFile) {
+        Alert.alert('Error', 'Please select a receipt file');
         return;
       }
 
-      // Upload image first
-      const receiptUrl = await uploadImage();
+      // Upload file first
+      const receiptUrl = await uploadFile();
       
-      // Update form data with actual receipt URL
+      // Update form data with actual receipt URL and convert Date to ISO string
       const submitData = {
         ...data,
         receiptUrl,
+        billDate: data.billDate.toISOString(), // Convert Date to ISO string for backend
       };
 
       const response = await submitEarnRequest(submitData);
@@ -187,7 +150,7 @@ export default function EarnCoinsScreen() {
 
       // Reset form and image
       reset();
-      setSelectedImage(null);
+      setSelectedFile(null);
     } catch (error) {
       Alert.alert('Error', error instanceof Error ? error.message : 'Failed to submit earn request');
     }
@@ -213,48 +176,21 @@ export default function EarnCoinsScreen() {
       <View style={{ padding: spacing[4] }}>
         <Text style={{ fontSize: 32, fontWeight: '700', marginBottom: spacing[6] }}>Earn Coins</Text>
         
-        {/* Image Upload Section */}
+        {/* File Upload Section */}
         <View style={{ marginBottom: spacing[6] }}>
           <Text style={{ fontSize: 20, fontWeight: '600', marginBottom: spacing[3] }}>Upload Receipt</Text>
           
-          <TouchableOpacity
-            onPress={handleImagePick}
-            style={{
-              borderWidth: 2,
-              borderColor: selectedImage ? colors.success[500] : colors.neutral[300],
-              borderStyle: 'dashed',
-              borderRadius: 8,
-              padding: spacing[6],
-              alignItems: 'center',
-              backgroundColor: selectedImage ? colors.success[100] : colors.neutral[100],
-            }}
+          <FileUpload
+            onFileSelect={handleFileSelect}
+            onFileRemove={handleFileRemove}
+            selectedFile={selectedFile}
+            label="Receipt File"
+            placeholder="Tap to select receipt file"
+            acceptTypes={['image', 'pdf']}
+            maxSize={5}
             disabled={isUploading}
-          >
-            {selectedImage ? (
-              <View style={{ alignItems: 'center' }}>
-                <Image
-                  source={{ uri: selectedImage.uri }}
-                  style={{ width: 120, height: 90, borderRadius: 8, marginBottom: spacing[3] }}
-                />
-                <Text style={{ fontSize: 16, fontWeight: '400', color: colors.success[600] }}>
-                  Receipt selected ✓
-                </Text>
-                <Text style={{ fontSize: 12, fontWeight: '400', color: colors.neutral[600], marginTop: spacing[2] }}>
-                  Tap to change image
-                </Text>
-              </View>
-            ) : (
-              <View style={{ alignItems: 'center' }}>
-                <Text style={{ fontSize: 48, color: colors.neutral[400] }}>📷</Text>
-                <Text style={{ fontSize: 16, fontWeight: '400', color: colors.neutral[600], marginTop: spacing[2] }}>
-                  Tap to select receipt image
-                </Text>
-                <Text style={{ fontSize: 12, fontWeight: '400', color: colors.neutral[500], marginTop: spacing[1] }}>
-                  JPEG or PNG, max 5MB
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
+            loading={isUploading}
+          />
         </View>
 
         {/* Form Fields */}
@@ -277,7 +213,7 @@ export default function EarnCoinsScreen() {
                           onPress={() => onChange(brand.id)}
                           style={{
                             padding: spacing[3],
-                            borderRadius: 8,
+                            borderRadius: borderRadius.md,
                             backgroundColor: value === brand.id ? colors.primary[500] : colors.neutral[100],
                             borderWidth: 2,
                             borderColor: value === brand.id ? colors.primary[500] : colors.neutral[200],
@@ -302,7 +238,7 @@ export default function EarnCoinsScreen() {
                     </View>
                   </ScrollView>
                   {errors.brandId && (
-                    <Text style={{ color: colors.error[500], marginTop: spacing[1], ...typography.caption }}>
+                    <Text style={{ color: colors.error[500], marginTop: spacing[1], fontSize: 14 }}>
                       {errors.brandId.message}
                     </Text>
                   )}
@@ -313,7 +249,7 @@ export default function EarnCoinsScreen() {
 
           {/* Bill Amount */}
           <View style={{ marginBottom: spacing[4] }}>
-            <Text style={{ ...typography.label, marginBottom: spacing[2] }}>Bill Amount (₹) *</Text>
+            <Text style={{ fontSize: 16, fontWeight: '500', marginBottom: spacing[2] }}>Bill Amount (₹) *</Text>
             <Controller
               control={control}
               name="billAmount"
@@ -322,7 +258,7 @@ export default function EarnCoinsScreen() {
                   style={{
                     borderWidth: 1,
                     borderColor: errors.billAmount ? colors.error[500] : colors.neutral[300],
-                    borderRadius: 8,
+                    borderRadius: borderRadius.md,
                     padding: spacing[3],
                     fontSize: 16,
                     backgroundColor: colors.white,
@@ -335,7 +271,7 @@ export default function EarnCoinsScreen() {
               )}
             />
             {errors.billAmount && (
-              <Text style={{ color: colors.error[500], marginTop: spacing[1], ...typography.caption }}>
+              <Text style={{ color: colors.error[500], marginTop: spacing[1], fontSize: 14 }}>
                 {errors.billAmount.message}
               </Text>
             )}
@@ -343,51 +279,25 @@ export default function EarnCoinsScreen() {
 
           {/* Bill Date */}
           <View style={{ marginBottom: spacing[4] }}>
-            <Text style={{ ...typography.label, marginBottom: spacing[2] }}>Bill Date *</Text>
             <Controller
               control={control}
               name="billDate"
               render={({ field: { onChange, value } }) => (
-                <TouchableOpacity
-                  onPress={() => setShowDatePicker(true)}
-                  style={{
-                    borderWidth: 1,
-                    borderColor: colors.neutral[300],
-                    borderRadius: 8,
-                    padding: spacing[3],
-                    backgroundColor: colors.white,
-                  }}
-                >
-                  <Text style={{ fontSize: 16, color: colors.neutral[700] }}>
-                    {value ? new Date(value).toLocaleDateString() : 'Select date'}
-                  </Text>
-                </TouchableOpacity>
+                <DatePicker
+                  value={value}
+                  onDateChange={onChange}
+                  label="Bill Date *"
+                  placeholder="Select bill date"
+                  maximumDate={new Date()}
+                  error={errors.billDate?.message}
+                />
               )}
             />
-            {showDatePicker && (
-              <DateTimePicker
-                value={new Date()}
-                mode="date"
-                display="default"
-                onChange={(event, selectedDate) => {
-                  setShowDatePicker(false);
-                  if (selectedDate) {
-                    setValue('billDate', selectedDate.toISOString().split('T')[0]);
-                  }
-                }}
-                maximumDate={new Date()}
-              />
-            )}
-            {errors.billDate && (
-              <Text style={{ color: colors.error[500], marginTop: spacing[1], ...typography.caption }}>
-                {errors.billDate.message}
-              </Text>
-            )}
           </View>
 
           {/* Notes */}
           <View style={{ marginBottom: spacing[4] }}>
-            <Text style={{ ...typography.label, marginBottom: spacing[2] }}>Notes (Optional)</Text>
+            <Text style={{ fontSize: 16, fontWeight: '500', marginBottom: spacing[2] }}>Notes (Optional)</Text>
             <Controller
               control={control}
               name="notes"
@@ -396,7 +306,7 @@ export default function EarnCoinsScreen() {
                   style={{
                     borderWidth: 1,
                     borderColor: colors.neutral[300],
-                    borderRadius: 8,
+                    borderRadius: borderRadius.md,
                     padding: spacing[3],
                     fontSize: 16,
                     backgroundColor: colors.white,
@@ -411,7 +321,7 @@ export default function EarnCoinsScreen() {
               )}
             />
             {errors.notes && (
-              <Text style={{ color: colors.error[500], marginTop: spacing[1], ...typography.caption }}>
+              <Text style={{ color: colors.error[500], marginTop: spacing[1], fontSize: 14 }}>
                 {errors.notes.message}
               </Text>
             )}
@@ -422,17 +332,17 @@ export default function EarnCoinsScreen() {
             <View style={{
               backgroundColor: colors.success[50],
               padding: spacing[4],
-              borderRadius: 8,
+              borderRadius: borderRadius.md,
               borderLeftWidth: 4,
               borderLeftColor: colors.success[500],
             }}>
-              <Text style={{ ...typography.h3, color: colors.success[700], marginBottom: spacing[2] }}>
+              <Text style={{ fontSize: 18, fontWeight: '600', color: colors.success[700], marginBottom: spacing[2] }}>
                 You'll Earn
               </Text>
-              <Text style={{ ...typography.h1, color: colors.success[600] }}>
+              <Text style={{ fontSize: 24, fontWeight: '700', color: colors.success[600] }}>
                 {calculateCoinsEarned(watch('billAmount') || 0, watchedBrandId)} Coins
               </Text>
-              <Text style={{ ...typography.caption, color: colors.success[600] }}>
+              <Text style={{ fontSize: 14, color: colors.success[600] }}>
                 Based on {selectedBrand.earningPercentage}% of ₹{watch('billAmount') || 0}
               </Text>
             </View>
@@ -442,13 +352,13 @@ export default function EarnCoinsScreen() {
         {/* Submit Button */}
         <TouchableOpacity
           onPress={handleSubmit(onSubmit)}
-          disabled={!isValid || isSubmitting || isUploading || !selectedImage}
+          disabled={!isValid || isSubmitting || isUploading || !selectedFile}
           style={{
-            backgroundColor: (!isValid || isSubmitting || isUploading || !selectedImage) 
+            backgroundColor: (!isValid || isSubmitting || isUploading || !selectedFile) 
               ? colors.neutral[300] 
               : colors.primary[500],
             padding: spacing[4],
-            borderRadius: 8,
+            borderRadius: borderRadius.md,
             alignItems: 'center',
           }}
         >

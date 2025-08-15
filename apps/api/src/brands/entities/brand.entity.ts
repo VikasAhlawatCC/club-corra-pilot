@@ -30,11 +30,11 @@ export class Brand {
   @Column({ type: 'uuid', nullable: true })
   categoryId: string;
 
-  @Column({ type: 'decimal', precision: 5, scale: 2, default: 30 })
-  earningPercentage: number; // Percentage of MRP earned as coins (default: 30%)
+  @Column({ type: 'decimal', precision: 5, scale: 2, default: 10 })
+  earningPercentage: number; // Percentage of MRP earned as coins (default: 10%)
 
-  @Column({ type: 'decimal', precision: 5, scale: 2, default: 100 })
-  redemptionPercentage: number; // Percentage of MRP that can be redeemed (default: 100%)
+  @Column({ type: 'decimal', precision: 5, scale: 2, default: 30 })
+  redemptionPercentage: number; // Percentage of MRP that can be redeemed (default: 30%)
 
   @Column({ type: 'decimal', precision: 10, scale: 2, default: 1 })
   minRedemptionAmount: number; // Minimum amount required for redemption (default: 1)

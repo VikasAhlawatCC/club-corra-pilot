@@ -31,12 +31,15 @@ export const colors = {
     700: '#15803d'
   },    // Green
   warning: { 
+    50: '#fffbeb',
     100: '#fef3c7',
     500: '#F59E0B',
     600: '#d97706',
+    700: '#b45309',
     800: '#92400e'
   },    // Amber
   error: { 
+    50: '#fef2f2',
     100: '#fee2e2',
     500: '#EF4444',
     600: '#dc2626',
@@ -64,6 +67,10 @@ export const colors = {
     dark: {
       800: '#1A1D21',        // Elite dark gray
       900: '#0F1419',        // Elite deep black
+    },
+    light: {
+      50: '#F8FAFC',         // Very light background
+      100: '#F1F5F9',        // Light background
     },
     glass: 'rgba(255, 255, 255, 0.15)',  // Enhanced glassmorphism
     glassDark: 'rgba(0, 0, 0, 0.4)',     // Enhanced dark glass
@@ -98,17 +105,20 @@ export const colors = {
   input: {
     background: '#2A2F36',   // Elite input background
     border: '#3B4148',       // Elite input border
-    borderFocused: '#0EA5E9', // Focused border
-    text: '#FFFFFF',         // Input text
-    placeholder: '#9CA3AF',  // Placeholder text
+    focus: '#0EA5E9',        // Focus border color
+    placeholder: '#9CA3AF',  // Placeholder text color
   },
 
-  // Additional colors for components
+  // Additional colors needed by components
   white: '#FFFFFF',
-  textSecondary: '#9CA3AF',
-  primaryLight: '#E0F2FE',
-  errorLight: '#FEE2E2',
-  disabled: '#6B7280',
+  black: '#000000',
+  gray: {
+    100: '#F3F4F6',
+    200: '#E5E7EB',
+    300: '#D1D5DB',
+    400: '#9CA3AF',
+    500: '#6B7280',
+  },
   // Border colors
   border: {
     primary: '#3B4148',
@@ -152,10 +162,17 @@ export const typography = {
 
   // Typography variants for consistent text styling
   body: { fontSize: 16, fontWeight: '400' as const, lineHeight: 24 },
+  bodyMedium: { fontSize: 16, fontWeight: '500' as const, lineHeight: 24 },
+  bodySmall: { fontSize: 14, fontWeight: '400' as const, lineHeight: 20 },
+  bodyLarge: { fontSize: 18, fontWeight: '400' as const, lineHeight: 28 },
   caption: { fontSize: 12, fontWeight: '400' as const, lineHeight: 16 },
   h1: { fontSize: 32, fontWeight: '700' as const, lineHeight: 40 },
   h2: { fontSize: 24, fontWeight: '600' as const, lineHeight: 32 },
   h3: { fontSize: 20, fontWeight: '600' as const, lineHeight: 28 },
+  heading: { fontSize: 20, fontWeight: '600' as const, lineHeight: 28 },
+  headingLarge: { fontSize: 24, fontWeight: '700' as const, lineHeight: 32 },
+  headingMedium: { fontSize: 20, fontWeight: '600' as const, lineHeight: 28 },
+  headingSmall: { fontSize: 18, fontWeight: '600' as const, lineHeight: 26 },
   label: { fontSize: 14, fontWeight: '500' as const, lineHeight: 20 },
   button: { fontSize: 16, fontWeight: '600' as const, lineHeight: 24 },
 };
@@ -217,22 +234,6 @@ export const shadows = {
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 12,
-  },
-  // Elite glassy shadow
-  glass: {
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 15 },
-    shadowOpacity: 0.5,
-    shadowRadius: 35,
-    elevation: 15,
-  },
-  // Soft elite shadow
-  soft: {
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.3,
     shadowRadius: 25,
     elevation: 10,
   },
@@ -250,6 +251,30 @@ export const shadows = {
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,
     shadowRadius: 16,
+    elevation: 8,
+  },
+  // Card shadow
+  card: {
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  // Glass shadow
+  glass: {
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 15 },
+    shadowOpacity: 0.5,
+    shadowRadius: 35,
+    elevation: 15,
+  },
+  // Soft shadow
+  soft: {
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 20,
     elevation: 8,
   },
 };
