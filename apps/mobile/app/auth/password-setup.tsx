@@ -1,31 +1,36 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, Animated, Easing, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, Animated, Easing, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Button, Card, LoadingSpinner } from '@/components/common';
 import { colors, spacing, borderRadius, typography, shadows, glassEffects, animation } from '@/styles/theme';
+import { environment } from '@/config/environment';
 import { useAuthStore } from '@/stores/auth.store';
 
-export default function PasswordSetupScreen() {
-  const { mobileNumber, firstName, lastName } = useLocalSearchParams<{ 
-    mobileNumber: string; 
-    firstName: string; 
-    lastName: string; 
-  }>();
+export default function NewPasswordSetupScreen() {
+  const params = useLocalSearchParams();
+  const { mobileNumber, userId } = params;
   
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [isValid, setIsValid] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isValid, setIsValid] = useState(false);
+
+  // Password strength indicators
+  const [hasMinLength, setHasMinLength] = useState(false);
+  const [hasUppercase, setHasUppercase] = useState(false);
+  const [hasLowercase, setHasLowercase] = useState(false);
+  const [hasNumber, setHasNumber] = useState(false);
 
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideUpAnim = useRef(new Animated.Value(30)).current;
   const cardScaleAnim = useRef(new Animated.Value(0.95)).current;
+  const inputFocusAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     // Entrance animation
@@ -53,93 +58,55 @@ export default function PasswordSetupScreen() {
     entranceAnimation.start();
   }, [fadeAnim, slideUpAnim, cardScaleAnim]);
 
-  // Validate form in real-time
+  // Validate password strength
   useEffect(() => {
-    const isPasswordValid = password.length >= 8;
-    const isConfirmPasswordValid = password === confirmPassword && confirmPassword.length > 0;
-    setIsValid(isPasswordValid && isConfirmPasswordValid);
-  }, [password, confirmPassword]);
+    setHasMinLength(password.length >= 8);
+    setHasUppercase(/[A-Z]/.test(password));
+    setHasLowercase(/[a-z]/.test(password));
+    setHasNumber(/\d/.test(password));
+  }, [password]);
 
-  const validatePasswordStrength = (password: string): { isValid: boolean; message: string } => {
-    if (password.length < 8) {
-      return { isValid: false, message: 'Password must be at least 8 characters long' };
-    }
-    
-    const hasUpperCase = /[A-Z]/.test(password);
-    const hasLowerCase = /[a-z]/.test(password);
-    const hasNumbers = /\d/.test(password);
-    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
-    
-    if (!hasUpperCase || !hasLowerCase || !hasNumbers || !hasSpecialChar) {
-      return { 
-        isValid: false, 
-        message: 'Password must contain uppercase, lowercase, number, and special character' 
-      };
-    }
-    
-    return { isValid: true, message: 'Strong password' };
-  };
+  // Validate form
+  useEffect(() => {
+    const isPasswordValid = hasMinLength && hasUppercase && hasLowercase && hasNumber;
+    const isConfirmValid = password === confirmPassword && password.length > 0;
+    setIsValid(isPasswordValid && isConfirmValid);
+  }, [password, confirmPassword, hasMinLength, hasUppercase, hasLowercase, hasNumber]);
 
-  const handleContinue = async () => {
+  const handleSetupPassword = async () => {
     if (!isValid) {
-      Alert.alert('Invalid Password', 'Please ensure both passwords match and meet the requirements');
+      Alert.alert('Invalid Password', 'Please ensure your password meets all requirements and matches confirmation');
       return;
     }
 
-    const passwordValidation = validatePasswordStrength(password);
-    if (!passwordValidation.isValid) {
-      Alert.alert('Weak Password', passwordValidation.message);
-      return;
-    }
-    
-    if (!mobileNumber) {
-      Alert.alert('Error', 'Mobile number not found. Please start registration again.');
-      return;
-    }
-    
     setIsLoading(true);
     try {
-      // Use mobile number directly for password setup
-      // The user object will be created/updated on the backend during this process
-      
-      // Setup password using auth store with mobile number
-      await useAuthStore.getState().setupPassword(mobileNumber, {
-        password,
-        confirmPassword
+      // Use the auth store for password setup
+      const { newSetupPassword } = useAuthStore.getState();
+      const data = await newSetupPassword({
+        mobileNumber: mobileNumber as string,
+        password: password,
+        confirmPassword: confirmPassword,
       });
-      
+
       setIsLoading(false);
       
-      // Navigate to email verification (optional step)
-      router.push({
-        pathname: '/auth/email-verification',
-        params: { 
-          mobileNumber,
-          firstName,
-          lastName,
-          isOptional: 'true'
-        }
-      });
+      // Navigate to email verification or main app
+      if (data.requiresEmailVerification) {
+        router.push({ 
+          pathname: '/auth/email-verification', 
+          params: { 
+            mobileNumber: mobileNumber as string,
+            userId: data.userId,
+          } 
+        });
+      } else {
+        // Account is fully activated, go to main app
+        router.replace('/(tabs)/home');
+      }
     } catch (error) {
       setIsLoading(false);
-      if (error instanceof Error) {
-        if (error.message.includes('Account already exists')) {
-          Alert.alert(
-            'Account Exists', 
-            'This mobile number is already registered. Please use the login page instead.',
-            [
-              { 
-                text: 'Go to Login', 
-                onPress: () => router.push('/auth/login') 
-              }
-            ]
-          );
-          return;
-        }
-        Alert.alert('Setup Failed', error.message);
-      } else {
-        Alert.alert('Error', 'Failed to setup password. Please try again.');
-      }
+      Alert.alert('Error', error instanceof Error ? error.message : 'Failed to setup password. Please try again.');
     }
   };
 
@@ -147,18 +114,29 @@ export default function PasswordSetupScreen() {
     router.back();
   };
 
-  const getPasswordStrengthColor = () => {
-    const validation = validatePasswordStrength(password);
-    if (validation.isValid) return colors.success[500];
-    if (password.length >= 6) return colors.warning[500];
-    return colors.error[500];
+  const handleInputFocus = () => {
+    Animated.spring(inputFocusAnim, {
+      toValue: 1,
+      tension: 100,
+      friction: 8,
+      useNativeDriver: true,
+    }).start();
   };
 
-  const getPasswordStrengthText = () => {
-    const validation = validatePasswordStrength(password);
-    if (validation.isValid) return 'Strong';
-    if (password.length >= 6) return 'Medium';
-    return 'Weak';
+  const handleInputBlur = () => {
+    Animated.timing(inputFocusAnim, {
+      toValue: 0,
+      duration: 200,
+      easing: Easing.out(Easing.ease),
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const togglePasswordVisibility = () => setShowPassword(!showPassword);
+  const toggleConfirmPasswordVisibility = () => setShowConfirmPassword(!showConfirmPassword);
+
+  const getStrengthColor = (isValid: boolean) => {
+    return isValid ? colors.success[500] : colors.text.muted;
   };
 
   return (
@@ -167,211 +145,189 @@ export default function PasswordSetupScreen() {
         colors={[colors.background.dark[900], colors.background.dark[800]]}
         style={styles.gradient}
       >
-        <ScrollView 
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          bounces={true}
+        <KeyboardAvoidingView 
+          style={styles.keyboardAvoidingView}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
-          <View style={styles.content}>
-            {/* Header with Back Button */}
-            <Animated.View 
-              style={[
-                styles.header,
-                {
-                  opacity: fadeAnim,
-                  transform: [{ translateY: slideUpAnim }],
-                },
-              ]}
-            >
-              <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-                <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
-              </TouchableOpacity>
-              <View style={styles.logoContainer}>
-                <View style={styles.logoCircle}>
-                  <Text style={styles.logoText}>CC</Text>
-                </View>
-                <Text style={styles.appName}>Club Corra</Text>
-              </View>
-            </Animated.View>
-
-            {/* Password Setup Form */}
-            <Animated.View
-              style={[
-                styles.formContainer,
-                {
-                  opacity: fadeAnim,
-                  transform: [
-                    { translateY: slideUpAnim },
-                    { scale: cardScaleAnim },
-                  ],
-                },
-              ]}
-            >
-              <Card variant="elevated" padding={8} style={styles.formCard}>
-                <Text style={styles.formTitle}>Set Your Password</Text>
-                <Text style={styles.formSubtitle}>
-                  Create a strong password to secure your account
-                </Text>
-
-                {/* Password Input */}
-                <View style={styles.inputContainer}>
-                  <Text style={styles.inputLabel}>Password</Text>
-                  <View style={styles.passwordInputWrapper}>
-                    <TextInput
-                      style={styles.passwordInput}
-                      placeholder="Enter your password"
-                      placeholderTextColor={colors.text.placeholder}
-                      value={password}
-                      onChangeText={setPassword}
-                      secureTextEntry={!showPassword}
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                    />
-                    <TouchableOpacity
-                      onPress={() => setShowPassword(!showPassword)}
-                      style={styles.eyeButton}
-                    >
-                      <Ionicons
-                        name={showPassword ? "eye-off" : "eye"}
-                        size={20}
-                        color={colors.text.secondary}
-                      />
-                    </TouchableOpacity>
+          <ScrollView 
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={styles.content}>
+              {/* Header with Back Button */}
+              <Animated.View 
+                style={[
+                  styles.header,
+                  {
+                    opacity: fadeAnim,
+                    transform: [{ translateY: slideUpAnim }],
+                  },
+                ]}
+              >
+                <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+                  <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
+                </TouchableOpacity>
+                <View style={styles.logoContainer}>
+                  <View style={styles.logoCircle}>
+                    <Text style={styles.logoText}>CC</Text>
                   </View>
-                  
-                  {/* Password strength indicator */}
-                  {password.length > 0 && (
-                    <View style={styles.strengthContainer}>
-                      <View style={styles.strengthBar}>
-                        <View 
-                          style={[
-                            styles.strengthFill, 
-                            { 
-                              width: `${Math.min((password.length / 8) * 100, 100)}%`,
-                              backgroundColor: getPasswordStrengthColor()
-                            }
-                          ]} 
+                  <Text style={styles.appName}>Club Corra</Text>
+                </View>
+              </Animated.View>
+
+              {/* Password Setup Form */}
+              <Animated.View
+                style={[
+                  styles.formContainer,
+                  {
+                    opacity: fadeAnim,
+                    transform: [
+                      { translateY: slideUpAnim },
+                      { scale: cardScaleAnim },
+                    ],
+                  },
+                ]}
+              >
+                <Card variant="elevated" padding={8} style={styles.formCard}>
+                  <Text style={styles.formTitle}>Set Your Password</Text>
+                  <Text style={styles.formSubtitle}>
+                    Create a strong password to secure your account
+                  </Text>
+
+                  {/* Password Input */}
+                  <View style={styles.inputContainer}>
+                    <Text style={styles.inputLabel}>Password</Text>
+                    <View style={styles.passwordInputContainer}>
+                      <TextInput
+                        style={[
+                          styles.textInput,
+                          styles.passwordInput,
+                        ]}
+                        placeholder="Enter your password"
+                        placeholderTextColor={colors.text.muted}
+                        value={password}
+                        onChangeText={setPassword}
+                        onFocus={handleInputFocus}
+                        onBlur={handleInputBlur}
+                        secureTextEntry={!showPassword}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                      />
+                      <TouchableOpacity
+                        style={styles.eyeButton}
+                        onPress={togglePasswordVisibility}
+                      >
+                        <Ionicons
+                          name={showPassword ? "eye-off" : "eye"}
+                          size={20}
+                          color={colors.text.muted}
                         />
-                      </View>
-                      <Text style={[styles.strengthText, { color: getPasswordStrengthColor() }]}>
-                        {getPasswordStrengthText()}
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  {/* Password Strength Indicator */}
+                  <View style={styles.strengthContainer}>
+                    <Text style={styles.strengthLabel}>Password Requirements:</Text>
+                    <View style={styles.requirementItem}>
+                      <Ionicons
+                        name={hasMinLength ? "checkmark-circle" : "ellipse-outline"}
+                        size={16}
+                        color={getStrengthColor(hasMinLength)}
+                      />
+                      <Text style={[styles.requirementText, { color: getStrengthColor(hasMinLength) }]}>
+                        At least 8 characters
                       </Text>
                     </View>
-                  )}
-                </View>
-
-                {/* Confirm Password Input */}
-                <View style={styles.inputContainer}>
-                  <Text style={styles.inputLabel}>Confirm Password</Text>
-                  <View style={styles.passwordInputWrapper}>
-                    <TextInput
-                      style={styles.passwordInput}
-                      placeholder="Confirm your password"
-                      placeholderTextColor={colors.text.placeholder}
-                      value={confirmPassword}
-                      onChangeText={setConfirmPassword}
-                      secureTextEntry={!showConfirmPassword}
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                    />
-                    <TouchableOpacity
-                      onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-                      style={styles.eyeButton}
-                    >
+                    <View style={styles.requirementItem}>
                       <Ionicons
-                        name={showConfirmPassword ? "eye-off" : "eye"}
-                        size={20}
-                        color={colors.text.secondary}
+                        name={hasUppercase ? "checkmark-circle" : "ellipse-outline"}
+                        size={16}
+                        color={getStrengthColor(hasUppercase)}
                       />
-                    </TouchableOpacity>
-                  </View>
-                  
-                  {/* Password match indicator */}
-                  {confirmPassword.length > 0 && (
-                    <View style={styles.matchIndicator}>
-                      <Ionicons
-                        name={password === confirmPassword ? "checkmark-circle" : "close-circle"}
-                        size={20}
-                        color={password === confirmPassword ? colors.success[500] : colors.error[500]}
-                      />
-                      <Text style={[
-                        styles.matchText,
-                        { color: password === confirmPassword ? colors.success[500] : colors.error[500] }
-                      ]}>
-                        {password === confirmPassword ? 'Passwords match' : 'Passwords do not match'}
+                      <Text style={[styles.requirementText, { color: getStrengthColor(hasUppercase) }]}>
+                        One uppercase letter
                       </Text>
                     </View>
-                  )}
-                </View>
+                    <View style={styles.requirementItem}>
+                      <Ionicons
+                        name={hasLowercase ? "checkmark-circle" : "ellipse-outline"}
+                        size={16}
+                        color={getStrengthColor(hasLowercase)}
+                      />
+                      <Text style={[styles.requirementText, { color: getStrengthColor(hasLowercase) }]}>
+                        One lowercase letter
+                      </Text>
+                    </View>
+                    <View style={styles.requirementItem}>
+                      <Ionicons
+                        name={hasNumber ? "checkmark-circle" : "ellipse-outline"}
+                        size={16}
+                        color={getStrengthColor(hasNumber)}
+                      />
+                      <Text style={[styles.requirementText, { color: getStrengthColor(hasNumber) }]}>
+                        One number
+                      </Text>
+                    </View>
+                  </View>
 
-                {/* Password Requirements */}
-                <View style={styles.requirementsContainer}>
-                  <Text style={styles.requirementsTitle}>Password Requirements:</Text>
-                  <View style={styles.requirementItem}>
-                    <Ionicons
-                      name={password.length >= 8 ? "checkmark-circle" : "ellipse-outline"}
-                      size={16}
-                      color={password.length >= 8 ? colors.success[500] : colors.text.secondary}
-                    />
-                    <Text style={styles.requirementText}>At least 8 characters</Text>
+                  {/* Confirm Password Input */}
+                  <View style={styles.inputContainer}>
+                    <Text style={styles.inputLabel}>Confirm Password</Text>
+                    <View style={styles.passwordInputContainer}>
+                      <TextInput
+                        style={[
+                          styles.textInput,
+                          styles.passwordInput,
+                          confirmPassword && password !== confirmPassword && styles.textInputError,
+                        ]}
+                        placeholder="Confirm your password"
+                        placeholderTextColor={colors.text.muted}
+                        value={confirmPassword}
+                        onChangeText={setConfirmPassword}
+                        onFocus={handleInputFocus}
+                        onBlur={handleInputBlur}
+                        secureTextEntry={!showConfirmPassword}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                      />
+                      <TouchableOpacity
+                        style={styles.eyeButton}
+                        onPress={toggleConfirmPasswordVisibility}
+                      >
+                        <Ionicons
+                          name={showConfirmPassword ? "eye-off" : "eye"}
+                          size={20}
+                          color={colors.text.muted}
+                        />
+                      </TouchableOpacity>
+                    </View>
+                    {confirmPassword && password !== confirmPassword && (
+                      <Text style={styles.errorText}>Passwords do not match</Text>
+                    )}
                   </View>
-                  <View style={styles.requirementItem}>
-                    <Ionicons
-                      name={/[A-Z]/.test(password) ? "checkmark-circle" : "ellipse-outline"}
-                      size={16}
-                      color={/[A-Z]/.test(password) ? colors.success[500] : colors.text.secondary}
-                    />
-                    <Text style={styles.requirementText}>One uppercase letter</Text>
-                  </View>
-                  <View style={styles.requirementItem}>
-                    <Ionicons
-                      name={/[a-z]/.test(password) ? "checkmark-circle" : "ellipse-outline"}
-                      size={16}
-                      color={/[a-z]/.test(password) ? colors.success[500] : colors.text.secondary}
-                    />
-                    <Text style={styles.requirementText}>One lowercase letter</Text>
-                  </View>
-                  <View style={styles.requirementItem}>
-                    <Ionicons
-                      name={/\d/.test(password) ? "checkmark-circle" : "ellipse-outline"}
-                      size={16}
-                      color={/\d/.test(password) ? colors.success[500] : colors.text.secondary}
-                    />
-                    <Text style={styles.requirementText}>One number</Text>
-                  </View>
-                  <View style={styles.requirementItem}>
-                    <Ionicons
-                      name={/[!@#$%^&*(),.?":{}|<>]/.test(password) ? "checkmark-circle" : "ellipse-outline"}
-                      size={16}
-                      color={/[!@#$%^&*(),.?":{}|<>]/.test(password) ? colors.success[500] : colors.text.secondary}
-                    />
-                    <Text style={styles.requirementText}>One special character</Text>
-                  </View>
-                </View>
 
-                {/* Continue Button */}
-                <Button
-                  title={isLoading ? "Setting up..." : "Continue"}
-                  onPress={handleContinue}
-                  loading={isLoading}
-                  variant="primary"
-                  size="large"
-                  fullWidth
-                  disabled={!isValid || isLoading}
-                  style={[styles.continueButton, { opacity: isValid ? 1 : 0.6 }]}
-                />
+                  {/* Setup Button */}
+                  <Button
+                    title={isLoading ? "Setting Up..." : "Setup Password"}
+                    onPress={handleSetupPassword}
+                    variant="primary"
+                    size="large"
+                    disabled={!isValid || isLoading}
+                    style={styles.setupButton}
+                    loading={isLoading}
+                  />
 
-                {/* Loading indicator */}
-                {isLoading && (
-                  <View style={styles.loadingContainer}>
-                    <LoadingSpinner size="small" variant="primary" text="Setting up password..." />
-                  </View>
-                )}
-              </Card>
-            </Animated.View>
-          </View>
-        </ScrollView>
+                  <Text style={styles.helpText}>
+                    Your password will be securely encrypted and stored
+                  </Text>
+                </Card>
+              </Animated.View>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </LinearGradient>
     </SafeAreaView>
   );
@@ -385,188 +341,152 @@ const styles = StyleSheet.create({
   gradient: {
     flex: 1,
   },
+  keyboardAvoidingView: {
+    flex: 1,
+  },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     flexGrow: 1,
-    paddingBottom: spacing[10],
+    paddingBottom: spacing[6],
   },
   content: {
     flex: 1,
     paddingHorizontal: spacing[6],
-    paddingTop: spacing[8],
+    paddingTop: spacing[6],
   },
   header: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing[8],
-    position: 'relative',
+    marginBottom: spacing[6],
   },
   backButton: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    width: 44,
-    height: 44,
-    borderRadius: borderRadius.full,
-    backgroundColor: glassEffects.primary.backgroundColor,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...shadows.md,
-    borderWidth: 1,
-    borderColor: glassEffects.primary.borderColor,
+    padding: spacing[2],
+    marginRight: spacing[3],
   },
   logoContainer: {
+    flex: 1,
     alignItems: 'center',
-    marginBottom: spacing[4],
   },
   logoCircle: {
-    width: 72,
-    height: 72,
+    width: 48,
+    height: 48,
     borderRadius: borderRadius.full,
     backgroundColor: colors.primary[500],
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing[4],
+    marginBottom: spacing[2],
     ...shadows.glass,
     borderWidth: 2,
     borderColor: colors.primary[400],
   },
   logoText: {
-    fontSize: typography.fontSize['3xl'],
+    fontSize: typography.fontSize.xl,
     fontFamily: typography.fontFamily.bold,
     color: colors.text.white,
   },
   appName: {
-    fontSize: typography.fontSize['3xl'],
+    fontSize: typography.fontSize.lg,
     fontFamily: typography.fontFamily.display,
     color: colors.text.primary,
-    marginBottom: spacing[2],
     ...shadows.gold,
   },
   formContainer: {
-    width: '100%',
+    flex: 1,
   },
   formCard: {
-    alignItems: 'center',
-    padding: spacing[8],
     backgroundColor: glassEffects.card.backgroundColor,
     borderWidth: 1,
     borderColor: glassEffects.card.borderColor,
     ...shadows.glass,
   },
   formTitle: {
-    fontSize: typography.fontSize['3xl'],
+    fontSize: typography.fontSize['2xl'],
     fontFamily: typography.fontFamily.bold,
     color: colors.text.primary,
     textAlign: 'center',
-    marginBottom: spacing[3],
-    lineHeight: 32,
+    marginBottom: spacing[2],
   },
   formSubtitle: {
-    fontSize: typography.fontSize.lg,
-    color: colors.text.secondary,
+    fontSize: typography.fontSize.md,
+    color: colors.text.muted,
     textAlign: 'center',
-    marginBottom: spacing[8],
-    lineHeight: 24,
-    paddingHorizontal: spacing[4],
+    marginBottom: spacing[6],
+    lineHeight: 22,
   },
   inputContainer: {
-    width: '100%',
-    marginBottom: spacing[6],
+    marginBottom: spacing[4],
   },
   inputLabel: {
-    fontSize: typography.fontSize.md,
-    color: colors.text.secondary,
-    fontFamily: typography.fontFamily.medium,
-    marginBottom: spacing[3],
-    textAlign: 'center',
-  },
-  passwordInputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.input.background,
-    borderRadius: borderRadius.xl,
-    borderWidth: 2,
-    borderColor: colors.input.border,
-    paddingHorizontal: spacing[4],
-    ...shadows.md,
-  },
-  passwordInput: {
-    flex: 1,
-    height: 56,
-    fontSize: typography.fontSize.lg,
-    color: colors.text.input,
-    fontFamily: typography.fontFamily.medium,
-  },
-  eyeButton: {
-    padding: spacing[2],
-  },
-  strengthContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: spacing[3],
-    gap: spacing[3],
-  },
-  strengthBar: {
-    flex: 1,
-    height: 4,
-    backgroundColor: colors.input.border,
-    borderRadius: borderRadius.full,
-    overflow: 'hidden',
-  },
-  strengthFill: {
-    height: '100%',
-    borderRadius: borderRadius.full,
-  },
-  strengthText: {
     fontSize: typography.fontSize.sm,
     fontFamily: typography.fontFamily.medium,
-    minWidth: 50,
+    color: colors.text.primary,
+    marginBottom: spacing[2],
   },
-  matchIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: spacing[3],
-    gap: spacing[2],
-  },
-  matchText: {
-    fontSize: typography.fontSize.sm,
-    fontFamily: typography.fontFamily.medium,
-  },
-  requirementsContainer: {
-    width: '100%',
-    marginBottom: spacing[6],
-    padding: spacing[4],
+  textInput: {
     backgroundColor: colors.background.input,
-    borderRadius: borderRadius.lg,
     borderWidth: 1,
-    borderColor: colors.input.border,
-  },
-  requirementsTitle: {
+    borderColor: colors.border.input,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing[4],
+    paddingVertical: spacing[3],
     fontSize: typography.fontSize.md,
     color: colors.text.primary,
-    fontFamily: typography.fontFamily.semiBold,
-    marginBottom: spacing[3],
-    textAlign: 'center',
+    fontFamily: typography.fontFamily.regular,
+  },
+  passwordInput: {
+    paddingRight: spacing[12],
+  },
+  textInputError: {
+    borderColor: colors.error[500],
+    borderWidth: 2,
+  },
+  passwordInputContainer: {
+    position: 'relative',
+  },
+  eyeButton: {
+    position: 'absolute',
+    right: spacing[4],
+    top: spacing[3],
+    padding: spacing[1],
+  },
+  strengthContainer: {
+    marginBottom: spacing[4],
+    padding: spacing[3],
+    backgroundColor: colors.background.input,
+    borderRadius: borderRadius.md,
+  },
+  strengthLabel: {
+    fontSize: typography.fontSize.sm,
+    fontFamily: typography.fontFamily.medium,
+    color: colors.text.primary,
+    marginBottom: spacing[2],
   },
   requirementItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing[2],
-    gap: spacing[2],
+    marginBottom: spacing[1],
   },
   requirementText: {
     fontSize: typography.fontSize.sm,
-    color: colors.text.secondary,
-    fontFamily: typography.fontFamily.medium,
+    fontFamily: typography.fontFamily.regular,
+    marginLeft: spacing[2],
   },
-  continueButton: {
-    marginBottom: spacing[6],
-    ...shadows.gold,
+  errorText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.error[500],
+    marginTop: spacing[2],
+    fontFamily: typography.fontFamily.regular,
   },
-  loadingContainer: {
+  setupButton: {
     marginTop: spacing[6],
-    alignItems: 'center',
+    marginBottom: spacing[4],
+  },
+  helpText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.muted,
+    textAlign: 'center',
+    fontFamily: typography.fontFamily.regular,
   },
 });

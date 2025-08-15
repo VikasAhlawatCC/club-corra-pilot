@@ -83,31 +83,102 @@ export function adaptApiUserToUser(apiUser: ApiUser): User {
 
 // Convert API auth token to shared auth token type
 export function adaptApiAuthTokenToAuthToken(apiToken: ApiAuthToken) {
-  return {
+  console.log('Type adapter: adaptApiAuthTokenToAuthToken called with:', apiToken);
+  console.log('Type adapter: Token type:', typeof apiToken);
+  console.log('Type adapter: Token keys:', Object.keys(apiToken || {}));
+  
+  // Validate required fields
+  if (!apiToken.accessToken || !apiToken.refreshToken || !apiToken.expiresIn) {
+    console.error('Type adapter: Missing required token fields:', {
+      hasAccessToken: !!apiToken.accessToken,
+      hasRefreshToken: !!apiToken.refreshToken,
+      hasExpiresIn: !!apiToken.expiresIn,
+    });
+    throw new Error('Invalid token structure: missing required fields');
+  }
+  
+  const adaptedToken = {
     accessToken: apiToken.accessToken,
     refreshToken: apiToken.refreshToken,
     expiresIn: apiToken.expiresIn,
     tokenType: 'Bearer' as const,
   };
+  
+  console.log('Type adapter: Successfully adapted token:', adaptedToken);
+  return adaptedToken;
 }
 
 // Convert API response to shared auth response type
 export function adaptApiAuthResponse(apiResponse: any) {
+  console.log('Type adapter: adaptApiAuthResponse called with:', apiResponse);
+  console.log('Type adapter: Response type:', typeof apiResponse);
+  console.log('Type adapter: Response keys:', Object.keys(apiResponse || {}));
+  
+  // Handle case where backend returns tokens as separate fields (not nested in tokens object)
+  if (apiResponse.user && (apiResponse.accessToken || apiResponse.refreshToken)) {
+    console.log('Type adapter: Processing user with separate token fields...');
+    
+    try {
+      // Validate required token fields
+      if (!apiResponse.accessToken || !apiResponse.refreshToken || !apiResponse.expiresIn) {
+        console.error('Type adapter: Missing required token fields:', {
+          hasAccessToken: !!apiResponse.accessToken,
+          hasRefreshToken: !!apiResponse.refreshToken,
+          hasExpiresIn: !!apiResponse.expiresIn,
+        });
+        throw new Error('Invalid response: missing required token fields');
+      }
+      
+      // Create tokens object from separate fields
+      const tokens = {
+        accessToken: apiResponse.accessToken,
+        refreshToken: apiResponse.refreshToken,
+        expiresIn: apiResponse.expiresIn,
+        tokenType: 'Bearer' as const,
+      };
+      
+      console.log('Type adapter: Created tokens object:', tokens);
+      
+      return {
+        user: adaptApiUserToUser(apiResponse.user),
+        tokens: tokens,
+      };
+    } catch (error) {
+      console.error('Type adapter: Error creating tokens object:', error);
+      throw error;
+    }
+  }
+  
+  // Handle case where tokens are nested in a tokens object
   if (apiResponse.user && apiResponse.tokens) {
-    return {
-      user: adaptApiUserToUser(apiResponse.user),
-      tokens: adaptApiAuthTokenToAuthToken(apiResponse.tokens),
-    };
+    console.log('Type adapter: Processing user and nested tokens...');
+    console.log('Type adapter: Tokens object:', apiResponse.tokens);
+    console.log('Type adapter: Tokens keys:', Object.keys(apiResponse.tokens || {}));
+    
+    try {
+      const adaptedTokens = adaptApiAuthTokenToAuthToken(apiResponse.tokens);
+      console.log('Type adapter: Adapted tokens:', adaptedTokens);
+      
+      return {
+        user: adaptApiUserToUser(apiResponse.user),
+        tokens: adaptedTokens,
+      };
+    } catch (error) {
+      console.error('Type adapter: Error adapting tokens:', error);
+      throw error;
+    }
   }
   
   // If it's just a user object
   if (apiResponse.user) {
+    console.log('Type adapter: Processing user only...');
     return {
       user: adaptApiUserToUser(apiResponse.user),
       tokens: apiResponse.tokens,
     };
   }
   
+  console.log('Type adapter: No conversion needed, returning as-is');
   // Return as-is if no conversion needed
   return apiResponse;
 }

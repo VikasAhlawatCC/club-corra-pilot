@@ -7,8 +7,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { Button, Card, LoadingSpinner } from '@/components/common';
 import { colors, spacing, borderRadius, typography, shadows, glassEffects, animation } from '@/styles/theme';
 import { formatIndianMobileNumber } from '@shared/utils';
+import { environment } from '@/config/environment';
+import { useAuthStore } from '@/stores/auth.store';
 
-export default function RegisterScreen() {
+export default function NewSignupScreen() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [mobileNumber, setMobileNumber] = useState('');
@@ -92,15 +94,66 @@ export default function RegisterScreen() {
       // Format mobile number with country code
       const fullMobileNumber = formatIndianMobileNumber(mobileNumber);
       
-      const { useAuthStore } = require('@/stores/auth.store');
-      const initiate = useAuthStore.getState().initiateSignup;
-      await initiate({ 
-        mobileNumber: fullMobileNumber, 
+      // Debug logging
+      console.log('=== SIGNUP DEBUG ===');
+      console.log('Environment API Base URL:', environment.apiBaseUrl);
+      console.log('Full request URL:', `${environment.apiBaseUrl}/auth/signup/initial`);
+      console.log('Request payload:', {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
-        authMethod: 'SMS' 
+        mobileNumber: fullMobileNumber,
       });
+      console.log('Network Info:', {
+        userAgent: navigator.userAgent,
+        platform: Platform.OS,
+        version: Platform.Version,
+      });
+      console.log('====================');
+      
+      // Test network connectivity first
+      try {
+        const testResponse = await fetch(`${environment.apiBaseUrl}/health`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+        console.log('Network connectivity test successful:', testResponse.status);
+      } catch (testError) {
+        console.error('Network connectivity test failed:', testError);
+        throw new Error('Network connectivity test failed. Please check your connection to the server.');
+      }
+      
+      // Use the auth store for the new auth flow
+      const { newInitialSignup } = useAuthStore.getState();
+      const data = await newInitialSignup({
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        mobileNumber: fullMobileNumber,
+      });
+      
+      // Check if user already exists
+      if (data.redirectToLogin) {
+        Alert.alert(
+          'Account Already Exists',
+          data.existingUserMessage || 'This mobile number is already registered. Please login instead.',
+          [
+            {
+              text: 'Go to Login',
+              onPress: () => router.push('/auth/login'),
+            },
+            {
+              text: 'Cancel',
+              style: 'cancel',
+            },
+          ]
+        );
+        return;
+      }
+
       setIsLoading(false);
+      
+      // Navigate to OTP verification with the new flow
       router.push({ 
         pathname: '/auth/otp-verification', 
         params: { 
@@ -111,7 +164,21 @@ export default function RegisterScreen() {
       });
     } catch (error) {
       setIsLoading(false);
-      Alert.alert('Error', 'Failed to initiate signup. Please try again.');
+      console.error('Signup error details:', error);
+      
+      let errorMessage = 'Failed to create account. Please try again.';
+      
+      if (error instanceof Error) {
+        if (error.message === 'Network request failed') {
+          errorMessage = 'Network connection failed. Please check your internet connection and try again.';
+        } else if (error.message.includes('fetch')) {
+          errorMessage = 'Unable to reach the server. Please check your connection and try again.';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      Alert.alert('Error', errorMessage);
     }
   };
 
@@ -200,15 +267,18 @@ export default function RegisterScreen() {
                   <View style={styles.inputContainer}>
                     <Text style={styles.inputLabel}>First Name</Text>
                     <TextInput
-                      style={styles.textInput}
+                      style={[
+                        styles.textInput,
+                        isFocused && styles.textInputFocused,
+                      ]}
                       placeholder="Enter your first name"
-                      placeholderTextColor={colors.text.placeholder}
+                      placeholderTextColor={colors.text.muted}
                       value={firstName}
                       onChangeText={setFirstName}
-                      autoCapitalize="words"
-                      autoCorrect={false}
                       onFocus={handleInputFocus}
                       onBlur={handleInputBlur}
+                      autoCapitalize="words"
+                      autoCorrect={false}
                     />
                   </View>
 
@@ -216,94 +286,60 @@ export default function RegisterScreen() {
                   <View style={styles.inputContainer}>
                     <Text style={styles.inputLabel}>Last Name</Text>
                     <TextInput
-                      style={styles.textInput}
+                      style={[
+                        styles.textInput,
+                        isFocused && styles.textInputFocused,
+                      ]}
                       placeholder="Enter your last name"
-                      placeholderTextColor={colors.text.placeholder}
+                      placeholderTextColor={colors.text.muted}
                       value={lastName}
                       onChangeText={setLastName}
-                      autoCapitalize="words"
-                      autoCorrect={false}
                       onFocus={handleInputFocus}
                       onBlur={handleInputBlur}
+                      autoCapitalize="words"
+                      autoCorrect={false}
                     />
                   </View>
 
                   {/* Mobile Number Input */}
                   <View style={styles.inputContainer}>
                     <Text style={styles.inputLabel}>Mobile Number</Text>
-                    <Animated.View 
+                    <TextInput
                       style={[
-                        styles.phoneInputWrapper,
-                        {
-                          transform: [
-                            {
-                              scale: Animated.add(1, Animated.multiply(inputFocusAnim, 0.02)),
-                            },
-                          ],
-                          // Use static color toggled by focus state to avoid invalid Animated color operations
-                          borderColor: isFocused ? colors.input.borderFocused : colors.input.border,
-                        },
+                        styles.textInput,
+                        isFocused && styles.textInputFocused,
                       ]}
-                    >
-                      <View style={styles.countryCodeContainer}>
-                        <Text style={styles.countryCode}>+91</Text>
-                      </View>
-                      <TextInput
-                        style={styles.phoneInput}
-                        placeholder="Enter mobile number"
-                        placeholderTextColor={colors.text.placeholder}
-                        value={mobileNumber}
-                        onChangeText={setMobileNumber}
-                        keyboardType="phone-pad"
-                        maxLength={10}
-                        onFocus={handleInputFocus}
-                        onBlur={handleInputBlur}
-                      />
-                      {/* Validation indicator */}
-                      {mobileNumber.length > 0 && (
-                        <View style={styles.validationIndicator}>
-                          <Ionicons
-                            name={mobileNumber.length === 10 && /^\d+$/.test(mobileNumber) ? "checkmark-circle" : "close-circle"}
-                            size={20}
-                            color={mobileNumber.length === 10 && /^\d+$/.test(mobileNumber) ? colors.success[500] : colors.error[500]}
-                          />
-                        </View>
-                      )}
-                    </Animated.View>
-                    
-                    {/* Validation message */}
-                    {mobileNumber.length > 0 && mobileNumber.length !== 10 && (
-                      <Animated.Text
-                        style={[
-                          styles.validationMessage,
-                          {
-                            opacity: fadeAnim,
-                          },
-                        ]}
-                      >
-                        Please enter a valid 10-digit mobile number
-                      </Animated.Text>
-                    )}
+                      placeholder="Enter 10-digit mobile number"
+                      placeholderTextColor={colors.text.muted}
+                      value={mobileNumber}
+                      onChangeText={setMobileNumber}
+                      onFocus={handleInputFocus}
+                      onBlur={handleInputBlur}
+                      keyboardType="phone-pad"
+                      maxLength={10}
+                    />
+                    <Text style={styles.inputHint}>
+                      We'll send you a verification code
+                    </Text>
                   </View>
 
                   {/* Continue Button */}
                   <Button
-                    title={isLoading ? "Processing..." : "Continue"}
+                    title={isLoading ? "Creating Account..." : "Continue"}
                     onPress={handleContinue}
-                    loading={isLoading}
                     variant="primary"
                     size="large"
-                    fullWidth
                     disabled={!isValid || isLoading}
-                    style={[styles.continueButton, { opacity: isValid ? 1 : 0.6 }]}
+                    style={styles.continueButton}
+                    loading={isLoading}
                   />
 
-                  {/* Loading indicator */}
-                  {isLoading && (
-                    <View style={styles.loadingContainer}>
-                      <LoadingSpinner size="small" variant="primary" text="Initiating signup..." />
-                    </View>
-                  )}
+                  <Text style={styles.termsText}>
+                    By continuing, you agree to our{' '}
+                    <Text style={styles.termsLink}>Terms of Service</Text>
+                    {' '}and{' '}
+                    <Text style={styles.termsLink}>Privacy Policy</Text>
+                  </Text>
                 </Card>
               </Animated.View>
             </View>
@@ -330,161 +366,115 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    justifyContent: 'center',
-    paddingHorizontal: spacing[6],
-    paddingTop: spacing[8],
+    paddingBottom: spacing[6],
   },
   content: {
     flex: 1,
     paddingHorizontal: spacing[6],
-    paddingTop: spacing[8],
+    paddingTop: spacing[6],
   },
   header: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing[8],
-    position: 'relative',
+    marginBottom: spacing[6],
   },
   backButton: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    width: 44,
-    height: 44,
-    borderRadius: borderRadius.full,
-    backgroundColor: glassEffects.primary.backgroundColor,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...shadows.md,
-    borderWidth: 1,
-    borderColor: glassEffects.primary.borderColor,
+    padding: spacing[2],
+    marginRight: spacing[3],
   },
   logoContainer: {
+    flex: 1,
     alignItems: 'center',
-    marginBottom: spacing[4],
   },
   logoCircle: {
-    width: 72,
-    height: 72,
+    width: 48,
+    height: 48,
     borderRadius: borderRadius.full,
     backgroundColor: colors.primary[500],
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing[4],
+    marginBottom: spacing[2],
     ...shadows.glass,
     borderWidth: 2,
     borderColor: colors.primary[400],
   },
   logoText: {
-    fontSize: typography.fontSize['3xl'],
+    fontSize: typography.fontSize.xl,
     fontFamily: typography.fontFamily.bold,
     color: colors.text.white,
   },
   appName: {
-    fontSize: typography.fontSize['3xl'],
+    fontSize: typography.fontSize.lg,
     fontFamily: typography.fontFamily.display,
     color: colors.text.primary,
-    marginBottom: spacing[2],
     ...shadows.gold,
   },
   formContainer: {
-    width: '100%',
+    flex: 1,
   },
   formCard: {
-    alignItems: 'center',
-    padding: spacing[8],
     backgroundColor: glassEffects.card.backgroundColor,
     borderWidth: 1,
     borderColor: glassEffects.card.borderColor,
     ...shadows.glass,
   },
   formTitle: {
-    fontSize: typography.fontSize['3xl'],
+    fontSize: typography.fontSize['2xl'],
     fontFamily: typography.fontFamily.bold,
     color: colors.text.primary,
     textAlign: 'center',
-    marginBottom: spacing[3],
-    lineHeight: 32,
+    marginBottom: spacing[2],
   },
   formSubtitle: {
-    fontSize: typography.fontSize.lg,
-    color: colors.text.secondary,
+    fontSize: typography.fontSize.md,
+    color: colors.text.muted,
     textAlign: 'center',
-    marginBottom: spacing[8],
-    lineHeight: 24,
-    paddingHorizontal: spacing[4],
+    marginBottom: spacing[6],
+    lineHeight: 22,
   },
   inputContainer: {
-    width: '100%',
-    marginBottom: spacing[6],
+    marginBottom: spacing[4],
   },
   inputLabel: {
-    fontSize: typography.fontSize.md,
-    color: colors.text.secondary,
+    fontSize: typography.fontSize.sm,
     fontFamily: typography.fontFamily.medium,
-    marginBottom: spacing[3],
-    textAlign: 'center',
+    color: colors.text.primary,
+    marginBottom: spacing[2],
   },
   textInput: {
-    width: '100%',
-    height: 56,
-    fontSize: typography.fontSize.lg,
-    color: colors.text.input,
-    fontFamily: typography.fontFamily.medium,
-    backgroundColor: colors.input.background,
-    borderRadius: borderRadius.xl,
-    borderWidth: 2,
-    borderColor: colors.input.border,
+    backgroundColor: colors.background.input,
+    borderWidth: 1,
+    borderColor: colors.border.input,
+    borderRadius: borderRadius.md,
     paddingHorizontal: spacing[4],
-    ...shadows.md,
-  },
-  phoneInputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.input.background,
-    borderRadius: borderRadius.xl,
-    borderWidth: 2,
-    borderColor: colors.input.border,
-    paddingHorizontal: spacing[4],
-    ...shadows.md,
-  },
-  countryCodeContainer: {
-    backgroundColor: colors.primary[500],
-    paddingHorizontal: spacing[3],
-    paddingVertical: spacing[2],
-    borderRadius: borderRadius.lg,
-    marginRight: spacing[3],
-  },
-  countryCode: {
+    paddingVertical: spacing[3],
     fontSize: typography.fontSize.md,
-    color: colors.text.white,
-    fontFamily: typography.fontFamily.bold,
+    color: colors.text.primary,
+    fontFamily: typography.fontFamily.regular,
   },
-  phoneInput: {
-    flex: 1,
-    height: 56,
-    fontSize: typography.fontSize.lg,
-    color: colors.text.input,
-    fontFamily: typography.fontFamily.medium,
+  textInputFocused: {
+    borderColor: colors.primary[500],
+    borderWidth: 2,
+  },
+  inputHint: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.muted,
+    marginTop: spacing[2],
+    fontFamily: typography.fontFamily.regular,
   },
   continueButton: {
-    marginBottom: spacing[6],
-    ...shadows.gold,
-  },
-  validationIndicator: {
-    position: 'absolute',
-    right: spacing[4],
-    top: '50%',
-    transform: [{ translateY: -10 }],
-  },
-  validationMessage: {
-    fontSize: typography.fontSize.sm,
-    color: colors.error[500],
-    textAlign: 'center',
-    marginTop: spacing[2],
-    paddingHorizontal: spacing[4],
-  },
-  loadingContainer: {
     marginTop: spacing[6],
-    alignItems: 'center',
+    marginBottom: spacing[4],
+  },
+  termsText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.muted,
+    textAlign: 'center',
+    lineHeight: 18,
+    fontFamily: typography.fontFamily.regular,
+  },
+  termsLink: {
+    color: colors.primary[400],
+    fontFamily: typography.fontFamily.medium,
   },
 });

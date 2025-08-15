@@ -1,83 +1,134 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, ScrollView } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, Animated, Easing, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { Button, Card } from '@/components/common';
-import { colors, spacing, borderRadius, typography, shadows, glassEffects } from '@/styles/theme';
+import { Button, Card, LoadingSpinner } from '@/components/common';
+import { colors, spacing, borderRadius, typography, shadows, glassEffects, animation } from '@/styles/theme';
+import { environment } from '@/config/environment';
 import { useAuthStore } from '@/stores/auth.store';
 
-export default function EmailVerificationScreen() {
-  const { mobileNumber, firstName, lastName, isOptional } = useLocalSearchParams<{ 
-    mobileNumber: string; 
-    firstName?: string; 
-    lastName?: string; 
-    isOptional?: string; 
-  }>();
-  const [email, setEmail] = useState('');
-  const [verificationMethod, setVerificationMethod] = useState<'otp' | 'oauth'>('otp');
-  const [isLoading, setIsLoading] = useState(false);
+export default function NewEmailVerificationScreen() {
+  const params = useLocalSearchParams();
+  const { mobileNumber, userId } = params;
   
-  const { initiateSignup } = useAuthStore();
+  const [email, setEmail] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isValid, setIsValid] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
 
-  const handleContinue = async () => {
-    if (!email.trim()) {
-      Alert.alert('Missing Information', 'Please enter your email address');
+  // Animation values
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideUpAnim = useRef(new Animated.Value(30)).current;
+  const cardScaleAnim = useRef(new Animated.Value(0.95)).current;
+  const inputFocusAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    // Entrance animation
+    const entranceAnimation = Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: animation.timing.fade.duration,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }),
+      Animated.spring(slideUpAnim, {
+        toValue: 0,
+        tension: animation.spring.content.tension,
+        friction: animation.spring.content.friction,
+        useNativeDriver: true,
+      }),
+      Animated.spring(cardScaleAnim, {
+        toValue: 1,
+        tension: animation.spring.card.tension,
+        friction: animation.spring.card.friction,
+        useNativeDriver: true,
+      }),
+    ]);
+
+    entranceAnimation.start();
+  }, [fadeAnim, slideUpAnim, cardScaleAnim]);
+
+  // Validate email
+  useEffect(() => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    setIsValid(emailRegex.test(email));
+  }, [email]);
+
+  const handleAddEmail = async () => {
+    if (!isValid) {
+      Alert.alert('Invalid Email', 'Please enter a valid email address');
       return;
     }
-    
-    if (!mobileNumber) {
-      Alert.alert('Error', 'Mobile number not found. Please start registration again.');
-      return;
-    }
-    
+
     setIsLoading(true);
     try {
-      // Initiate signup with email verification
-      await initiateSignup({
-        mobileNumber,
+      // Use the auth store for adding email
+      const { newAddEmail } = useAuthStore.getState();
+      const data = await newAddEmail({
+        mobileNumber: mobileNumber as string,
         email: email.trim(),
-        authMethod: verificationMethod === 'oauth' ? 'GOOGLE' : 'EMAIL'
       });
+
+      setIsLoading(false);
       
-      // If email verification is optional, navigate directly to main app
-      if (isOptional === 'true') {
-        router.replace('/(tabs)/home');
-      } else {
-        // Navigate to profile setup with mobile number and email
-        router.push({
-          pathname: '/auth/profile-setup',
-          params: { 
-            mobileNumber,
-            email: email.trim(),
-            verificationMethod
-          }
-        });
-      }
+      // Show success message and navigate to main app
+      Alert.alert(
+        'Email Added Successfully',
+        'Your email has been added to your account. You can now use it for login and password recovery.',
+        [
+          {
+            text: 'Continue to App',
+            onPress: () => router.replace('/(tabs)/home'),
+          },
+        ]
+      );
     } catch (error) {
       setIsLoading(false);
-      if (error instanceof Error) {
-        Alert.alert('Verification Failed', error.message);
-      } else {
-        Alert.alert('Error', 'Email verification failed. Please try again.');
-      }
+      Alert.alert('Error', error instanceof Error ? error.message : 'Failed to add email. Please try again.');
     }
+  };
+
+  const handleSkipEmail = () => {
+    Alert.alert(
+      'Skip Email Verification',
+      'You can always add an email later for password recovery and notifications. Are you sure you want to skip?',
+      [
+        {
+          text: 'Skip for Now',
+          onPress: () => router.replace('/(tabs)/home'),
+        },
+        {
+          text: 'Add Email',
+          style: 'cancel',
+        },
+      ]
+    );
   };
 
   const handleBack = () => {
     router.back();
   };
 
-  const handleGoogleOAuth = () => {
-    // Navigate to Google OAuth screen
-    router.push({
-      pathname: '/auth/google-auth',
-      params: { 
-        mobileNumber,
-        isRegistration: 'true'
-      }
-    });
+  const handleInputFocus = () => {
+    Animated.spring(inputFocusAnim, {
+      toValue: 1,
+      tension: 100,
+      friction: 8,
+      useNativeDriver: true,
+    }).start();
+    setIsFocused(true);
+  };
+
+  const handleInputBlur = () => {
+    Animated.timing(inputFocusAnim, {
+      toValue: 0,
+      duration: 200,
+      easing: Easing.out(Easing.ease),
+      useNativeDriver: true,
+    }).start();
+    setIsFocused(false);
   };
 
   return (
@@ -86,159 +137,134 @@ export default function EmailVerificationScreen() {
         colors={[colors.background.dark[900], colors.background.dark[800]]}
         style={styles.gradient}
       >
-        <ScrollView contentContainerStyle={styles.content}>
-          {/* Header with Back Button */}
-          <View style={styles.header}>
-            <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-              <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
-            </TouchableOpacity>
-            <View style={styles.logoContainer}>
-              <View style={styles.logoCircle}>
-                <Text style={styles.logoText}>CC</Text>
-              </View>
-              <Text style={styles.appName}>Club Corra</Text>
-            </View>
-          </View>
-
-          {/* Email Verification Form */}
-          <Card variant="elevated" padding={8} style={styles.formCard}>
-            <Text style={styles.formTitle}>
-              {isOptional === 'true' ? 'Add Your Email (Optional)' : 'Verify Your Email'}
-            </Text>
-            <Text style={styles.formSubtitle}>
-              {isOptional === 'true' 
-                ? 'Add your email for account recovery and notifications. You can skip this step for now.'
-                : 'Choose how you\'d like to verify your email address'
-              }
-            </Text>
-
-            {/* Email Input */}
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Email Address</Text>
-              <TextInput
-                style={styles.textInput}
-                placeholder="Enter your email address"
-                placeholderTextColor={colors.text.placeholder}
-                value={email}
-                onChangeText={setEmail}
-                autoCapitalize="none"
-                autoCorrect={false}
-                keyboardType="email-address"
-              />
-            </View>
-
-            {/* Verification Method Selection */}
-            <View style={styles.methodContainer}>
-              <Text style={styles.methodLabel}>Verification Method</Text>
-              
-              <TouchableOpacity
+        <KeyboardAvoidingView 
+          style={styles.keyboardAvoidingView}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <ScrollView 
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={styles.content}>
+              {/* Header with Back Button */}
+              <Animated.View 
                 style={[
-                  styles.methodOption,
-                  verificationMethod === 'otp' && styles.methodOptionSelected
+                  styles.header,
+                  {
+                    opacity: fadeAnim,
+                    transform: [{ translateY: slideUpAnim }],
+                  },
                 ]}
-                onPress={() => setVerificationMethod('otp')}
-                activeOpacity={0.8}
               >
-                <View style={styles.methodIconContainer}>
-                  <Ionicons 
-                    name="mail" 
-                    size={24} 
-                    color={verificationMethod === 'otp' ? colors.primary[400] : colors.text.secondary} 
-                  />
-                </View>
-                <View style={styles.methodContent}>
-                  <Text style={[
-                    styles.methodTitle,
-                    verificationMethod === 'otp' && styles.methodTitleSelected
-                  ]}>
-                    Email OTP
-                  </Text>
-                  <Text style={styles.methodDescription}>
-                    Receive a verification code via email
-                  </Text>
-                </View>
-                {verificationMethod === 'otp' && (
-                  <View style={styles.methodCheckmark}>
-                    <Ionicons name="checkmark-circle" size={24} color={colors.primary[400]} />
-                  </View>
-                )}
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.methodOption,
-                  verificationMethod === 'oauth' && styles.methodOptionSelected
-                ]}
-                onPress={() => setVerificationMethod('oauth')}
-                activeOpacity={0.8}
-              >
-                <View style={styles.methodIconContainer}>
-                  <Ionicons 
-                    name="logo-google" 
-                    size={24} 
-                    color={verificationMethod === 'oauth' ? colors.primary[400] : colors.text.secondary} 
-                  />
-                </View>
-                <View style={styles.methodContent}>
-                  <Text style={[
-                    styles.methodTitle,
-                    verificationMethod === 'oauth' && styles.methodTitleSelected
-                  ]}>
-                    Google OAuth
-                  </Text>
-                  <Text style={styles.methodDescription}>
-                    Quick verification using your Google account
-                  </Text>
-                </View>
-                {verificationMethod === 'oauth' && (
-                  <View style={styles.methodCheckmark}>
-                    <Ionicons name="checkmark-circle" size={24} color={colors.primary[400]} />
-                  </View>
-                )}
-              </TouchableOpacity>
-            </View>
-
-            {/* Continue Button */}
-            <Button
-              title={isOptional === 'true' ? "Add Email" : "Continue"}
-              onPress={handleContinue}
-              loading={isLoading}
-              variant="primary"
-              size="large"
-              fullWidth
-              style={styles.continueButton}
-            />
-
-            {/* Skip Option (only show when email verification is optional) */}
-            {isOptional === 'true' && (
-              <TouchableOpacity
-                onPress={() => {
-                  // Navigate directly to main app since email verification is optional
-                  router.replace('/(tabs)/home');
-                }}
-                style={styles.skipButton}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.skipButtonText}>Skip for now</Text>
-              </TouchableOpacity>
-            )}
-
-            {/* Alternative OAuth Option */}
-            {verificationMethod === 'otp' && (
-              <View style={styles.alternativeContainer}>
-                <Text style={styles.alternativeText}>Or continue with</Text>
-                <TouchableOpacity
-                  style={styles.googleButton}
-                  onPress={handleGoogleOAuth}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="logo-google" size={20} color={colors.text.primary} />
-                  <Text style={styles.googleButtonText}>Google</Text>
+                <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+                  <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
                 </TouchableOpacity>
-              </View>
-            )}
-          </Card>
-        </ScrollView>
+                <View style={styles.logoContainer}>
+                  <View style={styles.logoCircle}>
+                    <Text style={styles.logoText}>CC</Text>
+                  </View>
+                  <Text style={styles.appName}>Club Corra</Text>
+                </View>
+              </Animated.View>
+
+              {/* Email Verification Form */}
+              <Animated.View
+                style={[
+                  styles.formContainer,
+                  {
+                    opacity: fadeAnim,
+                    transform: [
+                      { translateY: slideUpAnim },
+                      { scale: cardScaleAnim },
+                    ],
+                  },
+                ]}
+              >
+                <Card variant="elevated" padding={8} style={styles.formCard}>
+                  <Text style={styles.formTitle}>Add Your Email (Optional)</Text>
+                  <Text style={styles.formSubtitle}>
+                    Add an email address for password recovery and important notifications
+                  </Text>
+
+                  {/* Success Icon */}
+                  <View style={styles.successIconContainer}>
+                    <View style={styles.successIcon}>
+                      <Ionicons name="checkmark" size={32} color={colors.text.white} />
+                    </View>
+                    <Text style={styles.successText}>Account Created Successfully!</Text>
+                  </View>
+
+                  {/* Email Input */}
+                  <View style={styles.inputContainer}>
+                    <Text style={styles.inputLabel}>Email Address</Text>
+                    <TextInput
+                      style={[
+                        styles.textInput,
+                        isFocused && styles.textInputFocused,
+                      ]}
+                      placeholder="Enter your email address"
+                      placeholderTextColor={colors.text.muted}
+                      value={email}
+                      onChangeText={setEmail}
+                      onFocus={handleInputFocus}
+                      onBlur={handleInputBlur}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                    />
+                    <Text style={styles.inputHint}>
+                      We'll send you a verification email
+                    </Text>
+                  </View>
+
+                  {/* Benefits of Adding Email */}
+                  <View style={styles.benefitsContainer}>
+                    <Text style={styles.benefitsTitle}>Why add an email?</Text>
+                    <View style={styles.benefitItem}>
+                      <Ionicons name="key" size={16} color={colors.primary[400]} />
+                      <Text style={styles.benefitText}>Password recovery</Text>
+                    </View>
+                    <View style={styles.benefitItem}>
+                      <Ionicons name="notifications" size={16} color={colors.primary[400]} />
+                      <Text style={styles.benefitText}>Important updates</Text>
+                    </View>
+                    <View style={styles.benefitItem}>
+                      <Ionicons name="shield-checkmark" size={16} color={colors.primary[400]} />
+                      <Text style={styles.benefitText}>Enhanced security</Text>
+                    </View>
+                  </View>
+
+                  {/* Action Buttons */}
+                  <View style={styles.buttonContainer}>
+                    <Button
+                      title={isLoading ? "Adding Email..." : "Add Email"}
+                      onPress={handleAddEmail}
+                      variant="primary"
+                      size="large"
+                      disabled={!isValid || isLoading}
+                      style={styles.addEmailButton}
+                      loading={isLoading}
+                    />
+
+                    <Button
+                      title="Skip for Now"
+                      onPress={handleSkipEmail}
+                      variant="secondary"
+                      size="large"
+                      style={styles.skipButton}
+                    />
+                  </View>
+
+                  <Text style={styles.helpText}>
+                    You can always add or change your email in settings later
+                  </Text>
+                </Card>
+              </Animated.View>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </LinearGradient>
     </SafeAreaView>
   );
@@ -252,200 +278,167 @@ const styles = StyleSheet.create({
   gradient: {
     flex: 1,
   },
+  keyboardAvoidingView: {
+    flex: 1,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: spacing[6],
+  },
   content: {
-    flexGrow: 1, // Allow content to grow and take available space
+    flex: 1,
     paddingHorizontal: spacing[6],
-    paddingTop: spacing[8],
+    paddingTop: spacing[6],
   },
   header: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing[8],
-    position: 'relative',
+    marginBottom: spacing[6],
   },
   backButton: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    width: 44,
-    height: 44,
-    borderRadius: borderRadius.full,
-    backgroundColor: glassEffects.primary.backgroundColor,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...shadows.md,
-    borderWidth: 1,
-    borderColor: glassEffects.primary.borderColor,
+    padding: spacing[2],
+    marginRight: spacing[3],
   },
   logoContainer: {
+    flex: 1,
     alignItems: 'center',
-    marginBottom: spacing[4],
   },
   logoCircle: {
-    width: 72,
-    height: 72,
+    width: 48,
+    height: 48,
     borderRadius: borderRadius.full,
     backgroundColor: colors.primary[500],
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing[4],
+    marginBottom: spacing[2],
     ...shadows.glass,
     borderWidth: 2,
     borderColor: colors.primary[400],
   },
   logoText: {
-    fontSize: typography.fontSize['3xl'],
+    fontSize: typography.fontSize.xl,
     fontFamily: typography.fontFamily.bold,
     color: colors.text.white,
   },
   appName: {
-    fontSize: typography.fontSize['3xl'],
+    fontSize: typography.fontSize.lg,
     fontFamily: typography.fontFamily.display,
     color: colors.text.primary,
-    marginBottom: spacing[2],
     ...shadows.gold,
   },
+  formContainer: {
+    flex: 1,
+  },
   formCard: {
-    alignItems: 'center',
-    padding: spacing[8],
     backgroundColor: glassEffects.card.backgroundColor,
     borderWidth: 1,
     borderColor: glassEffects.card.borderColor,
     ...shadows.glass,
   },
   formTitle: {
-    fontSize: typography.fontSize['3xl'],
+    fontSize: typography.fontSize['2xl'],
     fontFamily: typography.fontFamily.bold,
     color: colors.text.primary,
     textAlign: 'center',
-    marginBottom: spacing[3],
-    lineHeight: 32,
+    marginBottom: spacing[2],
   },
   formSubtitle: {
-    fontSize: typography.fontSize.lg,
-    color: colors.text.secondary,
+    fontSize: typography.fontSize.md,
+    color: colors.text.muted,
     textAlign: 'center',
-    marginBottom: spacing[8],
-    lineHeight: 24,
-    paddingHorizontal: spacing[4],
+    marginBottom: spacing[6],
+    lineHeight: 22,
+  },
+  successIconContainer: {
+    alignItems: 'center',
+    marginBottom: spacing[6],
+  },
+  successIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.success[500],
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing[3],
+    ...shadows.glass,
+  },
+  successText: {
+    fontSize: typography.fontSize.lg,
+    fontFamily: typography.fontFamily.medium,
+    color: colors.success[500],
+    textAlign: 'center',
   },
   inputContainer: {
-    width: '100%',
     marginBottom: spacing[6],
   },
   inputLabel: {
-    fontSize: typography.fontSize.md,
-    color: colors.text.secondary,
+    fontSize: typography.fontSize.sm,
     fontFamily: typography.fontFamily.medium,
-    marginBottom: spacing[3],
-    textAlign: 'center',
+    color: colors.text.primary,
+    marginBottom: spacing[2],
   },
   textInput: {
-    height: 56,
-    backgroundColor: colors.input.background,
-    borderRadius: borderRadius.xl,
-    borderWidth: 2,
-    borderColor: colors.input.border,
+    backgroundColor: colors.background.input,
+    borderWidth: 1,
+    borderColor: colors.border.input,
+    borderRadius: borderRadius.md,
     paddingHorizontal: spacing[4],
-    fontSize: typography.fontSize.lg,
-    color: colors.text.input,
-    fontFamily: typography.fontFamily.medium,
-    ...shadows.md,
-  },
-  methodContainer: {
-    width: '100%',
-    marginBottom: spacing[6],
-  },
-  methodLabel: {
+    paddingVertical: spacing[3],
     fontSize: typography.fontSize.md,
-    color: colors.text.gold,
-    fontFamily: typography.fontFamily.semiBold,
-    marginBottom: spacing[4],
+    color: colors.text.primary,
+    fontFamily: typography.fontFamily.regular,
+  },
+  textInputFocused: {
+    borderColor: colors.primary[500],
+    borderWidth: 2,
+  },
+  inputHint: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.muted,
+    marginTop: spacing[2],
+    fontFamily: typography.fontFamily.regular,
+  },
+  benefitsContainer: {
+    marginBottom: spacing[6],
+    padding: spacing[4],
+    backgroundColor: colors.background.input,
+    borderRadius: borderRadius.md,
+  },
+  benefitsTitle: {
+    fontSize: typography.fontSize.md,
+    fontFamily: typography.fontFamily.medium,
+    color: colors.text.primary,
+    marginBottom: spacing[3],
     textAlign: 'center',
   },
-  methodOption: {
+  benefitItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.background.input,
-    padding: spacing[4],
-    borderRadius: borderRadius.xl,
-    marginBottom: spacing[3],
-    borderWidth: 2,
-    borderColor: colors.input.border,
-    ...shadows.md,
+    marginBottom: spacing[2],
   },
-  methodOptionSelected: {
-    backgroundColor: colors.primary[500],
-    borderColor: colors.primary[400],
-  },
-  methodIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: borderRadius.lg,
-    backgroundColor: colors.background.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing[3],
-    ...shadows.sm,
-  },
-  methodContent: {
-    flex: 1,
-  },
-  methodTitle: {
-    fontSize: typography.fontSize.lg,
-    fontFamily: typography.fontFamily.semiBold,
-    color: colors.text.primary,
-    marginBottom: spacing[1],
-  },
-  methodTitleSelected: {
-    color: colors.text.white,
-  },
-  methodDescription: {
+  benefitText: {
     fontSize: typography.fontSize.sm,
-    color: colors.text.secondary,
-    lineHeight: 18,
-  },
-  methodCheckmark: {
-    marginLeft: spacing[2],
-  },
-  continueButton: {
-    marginBottom: spacing[4],
-    ...shadows.gold,
-  },
-  alternativeContainer: {
-    width: '100%',
-    alignItems: 'center',
-    marginTop: spacing[6],
-  },
-  alternativeText: {
-    fontSize: typography.fontSize.md,
-    color: colors.text.secondary,
-    marginBottom: spacing[3],
-  },
-     googleButton: {
-     flexDirection: 'row',
-     alignItems: 'center',
-     justifyContent: 'center',
-     backgroundColor: colors.background.card,
-     paddingVertical: spacing[3],
-     paddingHorizontal: spacing[6],
-     borderRadius: borderRadius.lg,
-     ...shadows.md,
-   },
-  googleButtonText: {
-    fontSize: typography.fontSize.lg,
-    fontFamily: typography.fontFamily.medium,
     color: colors.text.primary,
     marginLeft: spacing[2],
+    fontFamily: typography.fontFamily.regular,
+  },
+  buttonContainer: {
+    marginBottom: spacing[4],
+  },
+  addEmailButton: {
+    marginBottom: spacing[3],
   },
   skipButton: {
-    paddingVertical: spacing[3],
-    paddingHorizontal: spacing[6],
-    marginTop: spacing[4],
+    marginBottom: spacing[3],
   },
-  skipButtonText: {
-    fontSize: typography.fontSize.md,
-    color: colors.text.secondary,
-    fontFamily: typography.fontFamily.medium,
+  helpText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.muted,
     textAlign: 'center',
+    fontFamily: typography.fontFamily.regular,
   },
 });

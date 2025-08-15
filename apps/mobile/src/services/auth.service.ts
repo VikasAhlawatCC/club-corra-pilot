@@ -571,6 +571,19 @@ class AuthService {
    */
   async storeTokens(tokens: AuthToken): Promise<void> {
     try {
+      console.log('Auth service: storeTokens called with:', tokens);
+      console.log('Auth service: Token type:', typeof tokens);
+      console.log('Auth service: Token keys:', Object.keys(tokens || {}));
+      
+      // Validate tokens before storing
+      if (!tokens || typeof tokens !== 'object') {
+        throw new Error('Invalid tokens object provided');
+      }
+      
+      if (!tokens.accessToken || !tokens.refreshToken || !tokens.expiresIn) {
+        throw new Error(`Missing required token fields: accessToken=${!!tokens.accessToken}, refreshToken=${!!tokens.refreshToken}, expiresIn=${!!tokens.expiresIn}`);
+      }
+      
       // In a real implementation, you would use secure storage like Expo SecureStore
       // For now, we'll use AsyncStorage as a placeholder
       const tokenData = {
@@ -581,13 +594,25 @@ class AuthService {
         storedAt: Date.now(),
       };
       
+      console.log('Auth service: Prepared token data:', tokenData);
+      
+      // Test AsyncStorage availability
+      try {
+        await AsyncStorage.setItem('test_key', 'test_value');
+        await AsyncStorage.removeItem('test_key');
+        console.log('Auth service: AsyncStorage is working');
+      } catch (storageError) {
+        console.error('Auth service: AsyncStorage test failed:', storageError);
+        throw new Error('AsyncStorage is not available or working properly');
+      }
+      
       // Store in AsyncStorage (replace with SecureStore in production)
       await AsyncStorage.setItem('auth_tokens', JSON.stringify(tokenData));
       
-      console.log('Tokens stored successfully');
+      console.log('Auth service: Tokens stored successfully');
     } catch (error) {
-      console.error('Failed to store tokens:', error);
-      throw new Error('Failed to store authentication tokens');
+      console.error('Auth service: Failed to store tokens:', error);
+      throw new Error(`Failed to store authentication tokens: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -787,6 +812,7 @@ class AuthService {
       body: JSON.stringify(emailData),
     });
   }
+
 }
 
 export const authService = new AuthService();

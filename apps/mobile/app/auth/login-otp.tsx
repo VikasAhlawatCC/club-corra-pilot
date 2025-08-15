@@ -53,8 +53,8 @@ export default function LoginOtpScreen() {
   };
 
   const handleVerifyOtp = async () => {
-    if (!otp || otp.length < 4) {
-      Alert.alert('Invalid OTP', 'Please enter the 4-digit OTP sent to your phone');
+    if (!otp || otp.length < 6) {
+      Alert.alert('Invalid OTP', 'Please enter the 6-digit OTP sent to your phone');
       return;
     }
     
@@ -68,11 +68,14 @@ export default function LoginOtpScreen() {
       // Format mobile number with country code
       const fullMobileNumber = formatIndianMobileNumber(mobileNumber);
       // Login with OTP
-      await login(fullMobileNumber, otp);
+      console.log('Attempting login with:', { mobileNumber: fullMobileNumber, otp });
+      const result = await login(fullMobileNumber, otp);
+      console.log('Login result:', result);
       
       // Navigate to main app on successful login
       router.replace('/(tabs)/home');
     } catch (error) {
+      console.error('Login error details:', error);
       setIsLoading(false);
       if (error instanceof Error) {
         Alert.alert('Login Failed', error.message);
@@ -132,7 +135,7 @@ export default function LoginOtpScreen() {
             <Text style={styles.formTitle}>Login with OTP</Text>
             <Text style={styles.formSubtitle}>
               {isOtpSent 
-                ? 'Enter the verification code sent to your mobile number'
+                ? 'Enter the 6-digit verification code sent to your mobile number'
                 : 'Enter your mobile number to receive a verification code'
               }
             </Text>
@@ -162,12 +165,12 @@ export default function LoginOtpScreen() {
                 <Text style={styles.otpLabel}>Verification Code</Text>
                 <TextInput
                   style={styles.otpInput}
-                  placeholder="0000"
+                  placeholder="000000"
                   placeholderTextColor={colors.text.placeholder}
                   value={otp}
                   onChangeText={setOtp}
                   keyboardType="number-pad"
-                  maxLength={4}
+                  maxLength={6}
                   textAlign="center"
                 />
               </View>

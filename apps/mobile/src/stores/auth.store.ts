@@ -333,10 +333,15 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true });
         
         try {
+          console.log('Auth store: Calling authService.login with:', { mobileNumber, otp });
           const response = await authService.login(mobileNumber, otp);
+          console.log('Auth store: Received response:', response);
+          console.log('Auth store: Response tokens:', response.tokens);
           
           // Store tokens securely
+          console.log('Auth store: Attempting to store tokens...');
           await authService.storeTokens(response.tokens);
+          console.log('Auth store: Tokens stored successfully');
           
           set({ 
             user: response.user, 
@@ -347,7 +352,7 @@ export const useAuthStore = create<AuthState>()(
           
           return response;
         } catch (error) {
-          console.error('Login failed:', error);
+          console.error('Auth store: Login failed:', error);
           throw error;
         } finally {
           set({ isLoading: false });
@@ -669,6 +674,7 @@ export const useAuthStore = create<AuthState>()(
         }
       },
       newVerifySignupOtp: async (verificationData: any) => {
+        console.log('[DEBUG] newVerifySignupOtp called with:', verificationData);
         set({ isLoading: true });
         set((state) => ({ 
           otpVerificationState: { 
@@ -681,7 +687,9 @@ export const useAuthStore = create<AuthState>()(
           if (!mobileNumber) {
             throw new Error('No mobile number found. Please start signup again.');
           }
+          console.log('[DEBUG] Calling authService.newVerifySignupOtp');
           const response = await authService.newVerifySignupOtp(verificationData);
+          console.log('[DEBUG] Response received:', response);
           if ('accessToken' in response && 'refreshToken' in response && 'user' in response) {
             try {
               await authService.storeTokens({
@@ -712,7 +720,8 @@ export const useAuthStore = create<AuthState>()(
               console.error('Failed to store tokens:', error);
               throw new Error('Failed to store authentication tokens');
             }
-          } else if ('message' in response && 'requiresAdditionalVerification' in response) {
+          } else if ('message' in response && ('requiresAdditionalVerification' in response || 'requiresPasswordSetup' in response)) {
+            console.log('[DEBUG] Handling response with requiresPasswordSetup/requiresAdditionalVerification');
             if ('user' in response && response.user) {
               set({ user: response.user as User });
             }
@@ -758,6 +767,7 @@ export const useAuthStore = create<AuthState>()(
           }
           throw error;
         } finally {
+          console.log('[DEBUG] newVerifySignupOtp finally block, setting isLoading to false');
           set({ isLoading: false });
         }
       },
