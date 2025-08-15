@@ -5,7 +5,6 @@ const nextConfig = {
     // Add CloudFront domain when available
     // domains: ['localhost', 'your-cloudfront-domain.cloudfront.net'],
   },
-  transpilePackages: ['@shared/types', '@shared/schemas'],
 }
 
 module.exports = nextConfig

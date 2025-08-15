@@ -15,7 +15,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
   const pathname = usePathname()
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated && pathname !== '/login') {
+    if (!isLoading && !isAuthenticated && pathname !== '/login' && pathname !== '/') {
       router.push('/login')
     }
   }, [isAuthenticated, isLoading, router, pathname])
@@ -29,8 +29,8 @@ export function AuthGuard({ children }: AuthGuardProps) {
     )
   }
 
-  // If not authenticated and not on login page, don't render anything (will redirect)
-  if (!isAuthenticated && pathname !== '/login') {
+  // If not authenticated and not on login page or landing page, don't render anything (will redirect)
+  if (!isAuthenticated && pathname !== '/login' && pathname !== '/') {
     return null
   }
 

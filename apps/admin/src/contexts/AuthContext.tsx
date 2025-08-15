@@ -5,16 +5,18 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 interface AdminUser {
   id: string
   email: string
-  name: string
+  firstName: string
+  lastName: string
   role: 'ADMIN' | 'SUPER_ADMIN'
   permissions: string[]
+  status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED'
 }
 
 interface AuthContextType {
   user: AdminUser | null
   isAuthenticated: boolean
   isLoading: boolean
-  login: (email: string, password: string) => Promise<void>
+  login: (mobileNumber: string, password: string) => Promise<void>
   logout: () => void
   refreshUser: () => Promise<void>
 }
@@ -80,21 +82,42 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }
 
-  const login = async (email: string, password: string) => {
+  const login = async (mobileNumber: string, password: string) => {
     try {
       setIsLoading(true)
       
+      // Use the admin login endpoint - convert mobile number to email format for admin
+      // Since admin users typically use email, we'll treat mobile number as a special case
+      // You may need to adjust this based on your admin user structure
       const response = await fetch(`${API_BASE_URL}/auth/admin/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ 
+          email: mobileNumber, // Backend expects email, but we're sending mobile number
+          password 
+        }),
       })
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.message || 'Login failed')
+        const errorMessage = errorData.message || 'Login failed'
+        
+        // Provide specific error messages based on the response
+        if (response.status === 401) {
+          if (errorMessage.toLowerCase().includes('email') || errorMessage.toLowerCase().includes('mobile')) {
+            throw new Error('Mobile number not found. Please check your mobile number.')
+          } else if (errorMessage.toLowerCase().includes('password')) {
+            throw new Error('Incorrect password. Please try again.')
+          } else {
+            throw new Error('Invalid credentials. Please check your mobile number and password.')
+          }
+        } else if (response.status === 404) {
+          throw new Error('Mobile number not found. Please check your mobile number.')
+        } else {
+          throw new Error(errorMessage)
+        }
       }
 
       const data = await response.json()

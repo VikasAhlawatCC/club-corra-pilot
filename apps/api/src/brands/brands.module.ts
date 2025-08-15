@@ -4,12 +4,12 @@ import { BrandsController } from './brands.controller';
 import { BrandsService } from './brands.service';
 import { Brand } from './entities/brand.entity';
 import { BrandCategory } from './entities/brand-category.entity';
-// import { BrandCategoriesModule } from './brand-categories.module';
+import { BrandCategoriesModule } from './brand-categories.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Brand, BrandCategory]),
-    // BrandCategoriesModule,
+    BrandCategoriesModule,
   ],
   controllers: [BrandsController],
   providers: [BrandsService],

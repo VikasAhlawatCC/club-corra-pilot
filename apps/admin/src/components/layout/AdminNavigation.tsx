@@ -25,10 +25,15 @@ const navigation = [
 
 export function AdminNavigation() {
   const pathname = usePathname()
-  const { user, logout } = useAuth()
+  const { user, logout, isAuthenticated } = useAuth()
 
   const handleLogout = () => {
     logout()
+  }
+
+  // Don't render navigation if not authenticated
+  if (!isAuthenticated) {
+    return null
   }
 
   return (
@@ -64,7 +69,7 @@ export function AdminNavigation() {
             {user && (
               <>
                 <div className="text-right">
-                  <p className="text-sm font-medium text-gray-900">{user.name}</p>
+                  <p className="text-sm font-medium text-gray-900">{user.firstName} {user.lastName}</p>
                   <p className="text-xs text-gray-500">{user.role}</p>
                 </div>
                 <button

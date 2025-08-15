@@ -232,6 +232,38 @@ export const pendingRequestsResponseSchema = z.object({
   recentTransactions: z.array(coinTransactionSchema),
 });
 
+// Verification form schemas
+export const verificationFormSchema = z.object({
+  observedAmount: z.number().min(0.01, 'Observed amount must be greater than 0'),
+  receiptDate: z.string().min(1, 'Receipt date is required'), // Changed to string to match frontend
+  verificationConfirmed: z.boolean(), // Changed to match frontend
+  rejectionNote: z.string().max(1000, 'Rejection note too long').optional(),
+  adminNotes: z.string().max(1000, 'Admin notes too long').optional(),
+});
+
+export const userVerificationDataSchema = z.object({
+  id: z.string().uuid('Invalid user ID format'),
+  mobileNumber: z.string(),
+  email: z.string().email('Invalid email format').optional(),
+  profile: z.object({
+    firstName: z.string(),
+    lastName: z.string(),
+  }).optional(),
+  paymentDetails: z.object({
+    mobileNumber: z.string().optional(),
+    upiId: z.string().optional(),
+  }).optional(),
+});
+
+export const userVerificationResponseSchema = z.object({
+  success: z.boolean(),
+  message: z.string(),
+  data: z.object({
+    user: userVerificationDataSchema,
+    pendingRequests: pendingRequestsResponseSchema,
+  }),
+});
+
 // Type exports
 export type CoinBalance = z.infer<typeof coinBalanceSchema>;
 export type CoinTransaction = z.infer<typeof coinTransactionSchema>;
@@ -256,3 +288,6 @@ export type CoinAdjustmentResponse = z.infer<typeof coinAdjustmentResponseSchema
 export type BalanceResponse = z.infer<typeof balanceResponseSchema>;
 export type UserBalanceSummary = z.infer<typeof userBalanceSummarySchema>;
 export type PendingRequestsResponse = z.infer<typeof pendingRequestsResponseSchema>;
+export type VerificationFormData = z.infer<typeof verificationFormSchema>;
+export type UserVerificationData = z.infer<typeof userVerificationDataSchema>;
+export type UserVerificationResponse = z.infer<typeof userVerificationResponseSchema>;

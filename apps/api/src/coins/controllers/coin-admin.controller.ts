@@ -338,4 +338,64 @@ export class CoinAdminController {
       throw error;
     }
   }
+
+  @Get('users/:userId/pending-requests')
+  async getUserPendingRequests(@Param('userId') userId: string) {
+    try {
+      const pendingRequests = await this.coinsService.getUserPendingRequests(userId);
+      
+      return {
+        success: true,
+        message: 'User pending requests retrieved successfully',
+        data: pendingRequests,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to get pending requests for user ${userId}: ${error.message}`);
+      throw error;
+    }
+  }
+
+  @Get('users/:userId/details')
+  async getUserDetails(@Param('userId') userId: string) {
+    try {
+      const user = await this.coinsService.getUserDetails(userId);
+      
+      return {
+        success: true,
+        message: 'User details retrieved successfully',
+        data: { user },
+      };
+    } catch (error) {
+      this.logger.error(`Failed to get details for user ${userId}: ${error.message}`);
+      throw error;
+    }
+  }
+
+  @Get('users/:userId/verification-data')
+  async getUserVerificationData(@Param('userId') userId: string) {
+    try {
+      const [user, pendingRequests] = await Promise.all([
+        this.coinsService.getUserDetails(userId),
+        this.coinsService.getUserPendingRequests(userId),
+      ]);
+      
+      return {
+        success: true,
+        message: 'User verification data retrieved successfully',
+        data: {
+          user,
+          pendingRequests: {
+            data: pendingRequests.data,
+            total: pendingRequests.total,
+            page: pendingRequests.page,
+            limit: pendingRequests.limit,
+            totalPages: pendingRequests.totalPages,
+          },
+        },
+      };
+    } catch (error) {
+      this.logger.error(`Failed to get verification data for user ${userId}: ${error.message}`);
+      throw error;
+    }
+  }
 }

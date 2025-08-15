@@ -1,48 +1,97 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
-import { PlusIcon, MagnifyingGlassIcon, FunnelIcon } from '@heroicons/react/24/outline'
+import { PlusIcon, MagnifyingGlassIcon, FunnelIcon, ArrowPathIcon } from '@heroicons/react/24/outline'
 import { BrandTable } from '@/components/brands/BrandTable'
-import { brandApi } from '@/lib/api'
+import { brandApi, categoryApi } from '@/lib/api'
 import { useToast } from '@/components/common'
-import type { Brand } from '@shared/schemas'
+import { useBrands } from '@/hooks/useBrands'
+import { useBrandFilters } from '@/hooks/useBrandFilters'
+import { useDebounce } from '@/hooks/useDebounce'
+import { ErrorBoundary } from '@/components/common'
+import type { Brand, BrandCategory } from '@shared/schemas'
 
-export default function BrandsPage() {
-  const [brands, setBrands] = useState<Brand[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [searchTerm, setSearchTerm] = useState('')
-  const [categoryFilter, setCategoryFilter] = useState<string>('all')
-  const [statusFilter, setStatusFilter] = useState<string>('all')
-  const [currentPage, setCurrentPage] = useState(1)
-  const [totalPages, setTotalPages] = useState(1)
-  const [totalBrands, setTotalBrands] = useState(0)
+function BrandsPageContent() {
+  const [categories, setCategories] = useState<BrandCategory[]>([])
+  const [isLoadingCategories, setIsLoadingCategories] = useState(true)
+  const [pageSize, setPageSize] = useState(20)
+  const [showDeleteModal, setShowDeleteModal] = useState<string | null>(null)
   const { showSuccess, showError } = useToast()
+  
+  const {
+    brands,
+    isLoading,
+    totalPages,
+    totalBrands,
+    fetchBrands,
+    deleteBrand,
+    toggleBrandStatus,
+  } = useBrands()
+  
+  const {
+    searchTerm,
+    categoryFilter,
+    statusFilter,
+    currentPage,
+    setSearchTerm,
+    setCategoryFilter,
+    setStatusFilter,
+    setCurrentPage,
+    clearFilters,
+    handleFilterChange,
+    hasActiveFilters,
+  } = useBrandFilters()
+
+  // Debounce search term to prevent excessive API calls
+  const debouncedSearchTerm = useDebounce(searchTerm, 500)
 
   useEffect(() => {
-    fetchBrands()
-  }, [currentPage, searchTerm, categoryFilter, statusFilter])
+    fetchCategories()
+    fetchBrands({
+      page: currentPage,
+      pageSize,
+      searchTerm: searchTerm || undefined,
+      categoryId: categoryFilter === 'all' ? undefined : categoryFilter,
+      isActive: statusFilter === 'all' ? undefined : statusFilter === 'active'
+    })
+  }, []) // Only run once on mount
 
-  const fetchBrands = async () => {
+  useEffect(() => {
+    // Only fetch brands when dependencies actually change, not on every render
+    if (currentPage > 0) {
+      console.log('Fetching brands with params:', {
+        page: currentPage,
+        pageSize,
+        searchTerm: debouncedSearchTerm,
+        categoryFilter,
+        statusFilter
+      })
+      
+      fetchBrands({
+        page: currentPage,
+        pageSize,
+        searchTerm: debouncedSearchTerm || undefined,
+        categoryId: categoryFilter === 'all' ? undefined : categoryFilter,
+        isActive: statusFilter === 'all' ? undefined : statusFilter === 'active'
+      })
+    }
+  }, [currentPage, pageSize, debouncedSearchTerm, categoryFilter, statusFilter]) // Use debounced search term
+
+  const fetchCategories = async () => {
     try {
-      setIsLoading(true)
-      const response = await brandApi.getAllBrands(
-        currentPage,
-        20,
-        searchTerm || undefined,
-        categoryFilter === 'all' ? undefined : categoryFilter,
-        statusFilter === 'all' ? undefined : statusFilter === 'active'
-      )
-      setBrands(response.brands)
-      setTotalPages(response.totalPages)
-      setTotalBrands(response.total)
+      setIsLoadingCategories(true)
+      const response = await categoryApi.getAllCategories()
+      setCategories(response)
     } catch (error) {
-      console.error('Failed to fetch brands:', error)
-      showError('Failed to fetch brands')
+      console.error('Failed to fetch categories:', error)
+      showError('Failed to fetch categories')
     } finally {
-      setIsLoading(false)
+      setIsLoadingCategories(false)
     }
   }
+
+
 
   const handleEdit = (brand: Brand) => {
     // Navigate to edit page
@@ -50,14 +99,24 @@ export default function BrandsPage() {
   }
 
   const handleDelete = async (brandId: string) => {
-    try {
-      await brandApi.deleteBrand(brandId)
+    setShowDeleteModal(brandId)
+  }
+
+  const confirmDelete = async () => {
+    if (!showDeleteModal) return
+    
+    const success = await deleteBrand(showDeleteModal)
+    if (success) {
       showSuccess('Brand deleted successfully')
-      fetchBrands()
-    } catch (error) {
-      console.error('Failed to delete brand:', error)
-      showError('Failed to delete brand')
+      fetchBrands({
+        page: currentPage,
+        pageSize,
+        searchTerm: debouncedSearchTerm || undefined,
+        categoryId: categoryFilter === 'all' ? undefined : categoryFilter,
+        isActive: statusFilter === 'all' ? undefined : statusFilter === 'active'
+      })
     }
+    setShowDeleteModal(null)
   }
 
   const handleView = (brand: Brand) => {
@@ -67,12 +126,32 @@ export default function BrandsPage() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
+    if (isLoading) return // Prevent multiple API calls while loading
+    
     setCurrentPage(1)
-    fetchBrands()
+    fetchBrands({
+      page: 1,
+      pageSize,
+      searchTerm: searchTerm || undefined,
+      categoryId: categoryFilter === 'all' ? undefined : categoryFilter,
+      isActive: statusFilter === 'all' ? undefined : statusFilter === 'active'
+    })
   }
 
-  const handleFilterChange = () => {
-    setCurrentPage(1)
+  const handleToggleStatus = async (brandId: string) => {
+    if (isLoading) return // Prevent multiple API calls while loading
+    
+    const success = await toggleBrandStatus(brandId)
+    if (success) {
+      showSuccess('Brand status updated successfully')
+      fetchBrands({
+        page: currentPage,
+        pageSize,
+        searchTerm: debouncedSearchTerm || undefined,
+        categoryId: categoryFilter === 'all' ? undefined : categoryFilter,
+        isActive: statusFilter === 'all' ? undefined : statusFilter === 'active'
+      })
+    }
   }
 
   return (
@@ -82,13 +161,33 @@ export default function BrandsPage() {
           <h1 className="text-3xl font-bold text-gray-900">Brand Management</h1>
           <p className="text-gray-600">Manage partner brands and their earning/redeeming rules</p>
         </div>
-        <Link
-          href="/brands/new"
-          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-        >
-          <PlusIcon className="w-4 h-4 mr-2" />
-          Add Brand
-        </Link>
+        <div className="flex space-x-3">
+          <button
+            onClick={() => {
+              if (isLoading) return // Prevent multiple API calls while loading
+              fetchBrands({
+                page: currentPage,
+                pageSize,
+                searchTerm: debouncedSearchTerm || undefined,
+                categoryId: categoryFilter === 'all' ? undefined : categoryFilter,
+                isActive: statusFilter === 'all' ? undefined : statusFilter === 'active'
+              })
+            }}
+            disabled={isLoading}
+            className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+            title="Refresh brands list"
+          >
+            <ArrowPathIcon className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+          <Link
+            href="/brands/new"
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          >
+            <PlusIcon className="w-4 h-4 mr-2" />
+            Add Brand
+          </Link>
+        </div>
       </div>
 
       {/* Search and Filters */}
@@ -121,16 +220,25 @@ export default function BrandsPage() {
                 value={categoryFilter}
                 onChange={(e) => {
                   setCategoryFilter(e.target.value)
-                  handleFilterChange()
+                  setCurrentPage(1)
                 }}
                 className="block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                disabled={isLoadingCategories}
               >
                 <option value="all">All Categories</option>
-                {/* TODO: Add categories from API */}
-                <option value="ecommerce">E-commerce</option>
-                <option value="food">Food & Beverage</option>
-                <option value="retail">Retail</option>
+                {isLoadingCategories ? (
+                  <option value="" disabled>Loading categories...</option>
+                ) : (
+                  categories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
+                  ))
+                )}
               </select>
+              {isLoadingCategories && (
+                <p className="mt-1 text-xs text-gray-500">Loading categories...</p>
+              )}
             </div>
 
             <div>
@@ -142,7 +250,7 @@ export default function BrandsPage() {
                 value={statusFilter}
                 onChange={(e) => {
                   setStatusFilter(e.target.value)
-                  handleFilterChange()
+                  setCurrentPage(1)
                 }}
                 className="block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
               >
@@ -154,16 +262,38 @@ export default function BrandsPage() {
           </div>
           
           <div className="flex justify-between items-center">
-            <button
-              type="submit"
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-            >
-              <FunnelIcon className="w-4 h-4 mr-2" />
-              Apply Filters
-            </button>
+            <div className="flex space-x-3">
+              <button
+                type="submit"
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              >
+                <FunnelIcon className="w-4 h-4 mr-2" />
+                Apply Filters
+              </button>
+              
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchTerm('')
+                    setCategoryFilter('all')
+                    setStatusFilter('all')
+                    setCurrentPage(1)
+                  }}
+                  className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                >
+                  Clear Filters
+                </button>
+              )}
+            </div>
             
             <div className="text-sm text-gray-500">
               Showing {brands.length} of {totalBrands} brands
+              {hasActiveFilters && (
+                <span className="ml-2 text-indigo-600">
+                  (filtered)
+                </span>
+              )}
             </div>
           </div>
         </form>
@@ -177,6 +307,10 @@ export default function BrandsPage() {
           
           {isLoading ? (
             <div className="animate-pulse space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="h-4 bg-gray-200 rounded w-1/4"></div>
+                <div className="h-4 bg-gray-200 rounded w-1/6"></div>
+              </div>
               {[...Array(5)].map((_, i) => (
                 <div key={i} className="h-16 bg-gray-200 rounded"></div>
               ))}
@@ -211,6 +345,7 @@ export default function BrandsPage() {
                 onEdit={handleEdit}
                 onDelete={handleDelete}
                 onView={handleView}
+                onToggleStatus={handleToggleStatus}
               />
               
               {/* Pagination */}
@@ -241,6 +376,49 @@ export default function BrandsPage() {
           )}
         </div>
       </div>
+      
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div className="mt-3 text-center">
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
+                <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 mt-4">Delete Brand</h3>
+              <div className="mt-2 px-7 py-3">
+                <p className="text-sm text-gray-500">
+                  Are you sure you want to delete this brand? This action cannot be undone.
+                </p>
+              </div>
+              <div className="flex justify-center space-x-4 mt-4">
+                <button
+                  onClick={() => setShowDeleteModal(null)}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 font-medium hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmDelete}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-md"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
+  )
+}
+
+export default function BrandsPage() {
+  return (
+    <ErrorBoundary>
+      <BrandsPageContent />
+    </ErrorBoundary>
   )
 }

@@ -1,4 +1,4 @@
-export { default as ErrorBoundary } from './ErrorBoundary'
+export { ErrorBoundary } from './ErrorBoundary'
 export { LoadingSpinner, LoadingSpinnerInline } from './LoadingSpinner'
 export { default as Toast, ToastContainer, useToast } from './Toast'
 export type { ToastType } from './Toast'
