@@ -1,8 +1,9 @@
-'use client'
+  'use client'
 
 import React from 'react'
 import { TransactionTable } from './TransactionTable'
 import { TransactionDetailModal } from './TransactionDetailModal'
+import { TransactionVerificationModal } from './TransactionVerificationModal'
 import { PaymentProcessingModal } from './PaymentProcessingModal'
 import { TransactionActionButtons } from './TransactionActionButtons'
 import type { CoinTransaction } from '@shared/schemas'
@@ -12,8 +13,10 @@ interface TransactionListProps {
   isLoading: boolean
   selectedTransaction: CoinTransaction | null
   showDetailModal: boolean
+  showVerificationModal: boolean
   onTransactionSelect: (transaction: CoinTransaction) => void
   onDetailModalClose: () => void
+  onVerificationModalClose: () => void
   onPaymentModalClose: () => void
   onApproveEarn: (transactionId: string, adminNotes?: string) => Promise<void>
   onRejectEarn: (transactionId: string, adminNotes: string) => Promise<void>
@@ -33,8 +36,10 @@ export function TransactionList({
   isLoading,
   selectedTransaction,
   showDetailModal,
+  showVerificationModal,
   onTransactionSelect,
   onDetailModalClose,
+  onVerificationModalClose,
   onPaymentModalClose,
   onApproveEarn,
   onRejectEarn,
@@ -71,24 +76,61 @@ export function TransactionList({
         onProcessPayment={onProcessPayment}
       />
 
-      {/* Transaction Detail Modal */}
-      {selectedTransaction && (
-        <TransactionDetailModal
-          transaction={selectedTransaction}
-          isOpen={showDetailModal}
-          onClose={onDetailModalClose}
-        />
-      )}
+      {/* Stable Modal Container - Prevents DOM manipulation errors */}
+      <div className="modal-container">
+        {/* Transaction Verification Modal for Pending Transactions */}
+        {selectedTransaction && selectedTransaction.status === 'PENDING' && (
+          <div key={`verification-container-${selectedTransaction.id}`}>
+            <TransactionVerificationModal
+              key={`verification-${selectedTransaction.id}`}
+              transaction={selectedTransaction}
+              isOpen={showVerificationModal}
+              onClose={onVerificationModalClose}
+              onApprove={async (transactionId: string, verificationData: any) => {
+                if (selectedTransaction.type === 'EARN') {
+                  await onApproveEarn(transactionId, verificationData.adminNotes)
+                } else if (selectedTransaction.type === 'REDEEM') {
+                  await onApproveRedeem(transactionId, verificationData.adminNotes)
+                }
+              }}
+              onReject={async (transactionId: string, reason: string, adminNotes?: string) => {
+                if (selectedTransaction.type === 'EARN') {
+                  await onRejectEarn(transactionId, reason)
+                } else if (selectedTransaction.type === 'REDEEM') {
+                  await onRejectRedeem(transactionId, reason)
+                }
+              }}
+              onApproveAndPay={selectedTransaction.type === 'REDEEM' ? async (transactionId: string, verificationData: any) => {
+                // For redeem transactions, we can process payment after approval
+                await onApproveRedeem(transactionId, verificationData.adminNotes)
+                // TODO: Handle payment processing
+              } : undefined}
+            />
+          </div>
+        )}
 
-      {/* Payment Processing Modal */}
-      {selectedTransaction && selectedTransaction.type === 'REDEEM' && (
-        <PaymentProcessingModal
-          transaction={selectedTransaction}
-          isOpen={false} // This will be controlled by the parent
-          onClose={onPaymentModalClose}
-          onProcessPayment={onProcessPayment}
-        />
-      )}
+        {/* Transaction Detail Modal for Completed Transactions */}
+        {selectedTransaction && selectedTransaction.status !== 'PENDING' && (
+          <div key={`detail-container-${selectedTransaction.id}`}>
+            <TransactionDetailModal
+              key={`detail-${selectedTransaction.id}`}
+              transaction={selectedTransaction}
+              isOpen={showDetailModal}
+              onClose={onDetailModalClose}
+            />
+          </div>
+        )}
+
+        {/* Payment Processing Modal */}
+        {selectedTransaction && selectedTransaction.type === 'REDEEM' && (
+          <PaymentProcessingModal
+            transaction={selectedTransaction}
+            isOpen={false} // This will be controlled by the parent
+            onClose={onPaymentModalClose}
+            onProcessPayment={onProcessPayment}
+          />
+        )}
+      </div>
     </>
   )
 }

@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { File } from './file.entity';
 import { ConfigService } from '@nestjs/config';
+import axios from 'axios';
 
 @Injectable()
 export class FileService {
@@ -287,6 +288,67 @@ export class FileService {
     } catch (error) {
       this.logger.error(`Failed to get file stats: ${error.message}`);
       throw error;
+    }
+  }
+
+  async getReceiptImage(fileKey: string): Promise<{
+    fileName: string;
+    fileType: string;
+    fileContent: Buffer;
+  } | null> {
+    try {
+      // First try to find the file record by fileKey
+      let file = await this.fileRepository.findOne({
+        where: { fileKey, status: 'UPLOADED' },
+      });
+
+      // If not found by fileKey, try to find by URL hash (for external URLs)
+      if (!file) {
+        // This might be a URL hash from the frontend
+        // For now, we'll try to fetch from a mock URL for testing
+        // In production, you'd want to store the mapping between hashes and URLs
+        
+        // For testing purposes, let's create a mock response
+        const mockImageUrl = 'https://via.placeholder.com/400x600/cccccc/666666?text=Receipt+Image';
+        
+        try {
+          const response = await axios.get(mockImageUrl, {
+            responseType: 'arraybuffer',
+            timeout: 10000,
+            headers: {
+              'User-Agent': 'ClubCorra-API/1.0',
+            },
+          });
+
+          return {
+            fileName: 'receipt.jpg',
+            fileType: 'image/jpeg',
+            fileContent: Buffer.from(response.data as ArrayBuffer),
+          };
+        } catch (error) {
+          this.logger.error(`Failed to fetch mock image: ${error.message}`);
+          return null;
+        }
+      }
+
+      // Fetch the image content from the external URL
+      const response = await axios.get(file.fileUrl, {
+        responseType: 'arraybuffer',
+        timeout: 10000, // 10 second timeout
+        headers: {
+          'User-Agent': 'ClubCorra-API/1.0',
+        },
+      });
+
+      // Return the image data with metadata
+      return {
+        fileName: file.fileName,
+        fileType: file.fileType,
+        fileContent: Buffer.from(response.data as ArrayBuffer),
+      };
+    } catch (error) {
+      this.logger.error(`Failed to fetch receipt image for fileKey ${fileKey}: ${error.message}`);
+      return null;
     }
   }
 }

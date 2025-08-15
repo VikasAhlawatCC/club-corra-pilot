@@ -108,9 +108,16 @@ export function BrandForm({
     }
 
     // Cap validation
-
     if (formData.brandwiseMaxCap < 0) {
       newErrors.brandwiseMaxCap = 'Brandwise max cap must be non-negative'
+    }
+
+    // Business rule validation: maxRedemptionAmount should equal brandwiseMaxCap
+    if (formData.maxRedemptionAmount !== undefined && formData.brandwiseMaxCap !== undefined) {
+      if (formData.maxRedemptionAmount !== formData.brandwiseMaxCap) {
+        newErrors.maxRedemptionAmount = 'Maximum redemption amount must equal brandwise max cap'
+        newErrors.brandwiseMaxCap = 'Brandwise max cap must equal maximum redemption amount'
+      }
     }
 
     // URL validation
@@ -167,6 +174,14 @@ export function BrandForm({
     // Clear error when user starts typing
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }))
+    }
+
+    // Auto-sync maxRedemptionAmount with brandwiseMaxCap for business rule compliance
+    if (field === 'brandwiseMaxCap') {
+      setFormData(prev => ({ ...prev, maxRedemptionAmount: value }))
+    }
+    if (field === 'maxRedemptionAmount') {
+      setFormData(prev => ({ ...prev, brandwiseMaxCap: value }))
     }
   }
 

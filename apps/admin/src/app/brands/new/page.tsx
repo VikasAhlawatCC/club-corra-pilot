@@ -1,58 +1,54 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeftIcon } from '@heroicons/react/24/outline'
 import { BrandForm } from '@/components/brands/BrandForm'
+import { brandApi, categoryApi } from '@/lib/api'
 import { useToast, ToastContainer } from '@/components/common'
 import type { CreateBrandRequest, BrandCategory } from '@shared/schemas'
 
 export default function NewBrandPage() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
+  const [categories, setCategories] = useState<BrandCategory[]>([])
+  const [isLoadingCategories, setIsLoadingCategories] = useState(true)
   const { toasts, removeToast, showSuccess, showError } = useToast()
 
-  // Mock categories - in real app this would come from API
-  const categories: BrandCategory[] = [
-    {
-      id: '550e8400-e29b-41d4-a716-446655440010',
-      name: 'E-commerce',
-      description: 'Online shopping and digital services',
-      createdAt: new Date(),
-      updatedAt: new Date()
-    },
-    {
-      id: '550e8400-e29b-41d4-a716-446655440011',
-      name: 'Food & Beverage',
-      description: 'Food delivery and dining services',
-      createdAt: new Date(),
-      updatedAt: new Date()
-    },
-    {
-      id: '550e8400-e29b-41d4-a716-446655440012',
-      name: 'Retail',
-      description: 'Physical retail stores and shopping',
-      createdAt: new Date(),
-      updatedAt: new Date()
-    },
-    {
-      id: '550e8400-e29b-41d4-a716-446655440013',
-      name: 'Entertainment',
-      description: 'Movies, games, and entertainment services',
-      createdAt: new Date(),
-      updatedAt: new Date()
+  useEffect(() => {
+    fetchCategories()
+  }, [])
+
+  const fetchCategories = async () => {
+    try {
+      setIsLoadingCategories(true)
+      const response = await categoryApi.getAllCategories()
+      setCategories(response)
+    } catch (error) {
+      console.error('Failed to fetch categories:', error)
+      showError('Failed to fetch categories', 'Unable to load brand categories. Please try again.')
+    } finally {
+      setIsLoadingCategories(false)
     }
-  ]
+  }
 
   const handleSubmit = async (data: CreateBrandRequest | any) => {
     setIsLoading(true)
     try {
-      // TODO: Replace with actual API call
-      console.log('Creating brand:', data)
+      // Ensure data is properly typed as CreateBrandRequest
+      const brandData: CreateBrandRequest = {
+        name: data.name,
+        description: data.description,
+        categoryId: data.categoryId,
+        earningPercentage: data.earningPercentage,
+        redemptionPercentage: data.redemptionPercentage,
+        minRedemptionAmount: data.minRedemptionAmount,
+        maxRedemptionAmount: data.maxRedemptionAmount,
+        brandwiseMaxCap: data.brandwiseMaxCap,
+        logoUrl: data.logoUrl,
+      }
       
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
+      await brandApi.createBrand(brandData)
       showSuccess('Brand Created', 'New brand has been created successfully')
       
       // Redirect to brands list after a short delay
@@ -60,9 +56,10 @@ export default function NewBrandPage() {
         router.push('/brands')
       }, 1500)
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to create brand:', error)
-      showError('Creation Failed', 'Failed to create brand. Please try again.')
+      const errorMessage = error.message || 'Failed to create brand. Please try again.'
+      showError('Creation Failed', errorMessage)
     } finally {
       setIsLoading(false)
     }
@@ -99,6 +96,15 @@ export default function NewBrandPage() {
         onSubmit={handleSubmit}
         isLoading={isLoading}
       />
+      
+      {isLoadingCategories && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-40">
+          <div className="relative top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+            <p className="mt-4 text-center text-gray-600">Loading categories...</p>
+          </div>
+        </div>
+      )}
       
       <ToastContainer toasts={toasts} onRemove={removeToast} />
     </div>

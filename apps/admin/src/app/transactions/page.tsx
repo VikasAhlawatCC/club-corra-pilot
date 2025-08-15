@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { TransactionList } from '@/components/transactions/TransactionList'
 import { TransactionFilters } from '@/components/transactions/TransactionFilters'
 import { useToast, ToastContainer } from '@/components/common'
@@ -13,8 +13,6 @@ export default function TransactionsPage() {
   const [transactions, setTransactions] = useState<CoinTransaction[]>([])
   const [filteredTransactions, setFilteredTransactions] = useState<CoinTransaction[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [selectedTransaction, setSelectedTransaction] = useState<CoinTransaction | null>(null)
-  const [showDetailModal, setShowDetailModal] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [typeFilter, setTypeFilter] = useState<string>('all')
@@ -148,19 +146,49 @@ export default function TransactionsPage() {
     setFilteredTransactions(filtered)
   }, [transactions, searchTerm, statusFilter, typeFilter])
 
-  const handleTransactionSelect = (transaction: CoinTransaction) => {
-    setSelectedTransaction(transaction)
-    setShowDetailModal(true)
-  }
+  // Simple state management
+  const [selectedTransaction, setSelectedTransaction] = useState<CoinTransaction | null>(null)
+  const [showDetailModal, setShowDetailModal] = useState(false)
+  const [showVerificationModal, setShowVerificationModal] = useState(false)
+  const [isSelectingTransaction, setIsSelectingTransaction] = useState(false)
 
-  const handleDetailModalClose = () => {
+  const handleTransactionSelect = useCallback((transaction: CoinTransaction) => {
+    // Prevent rapid successive clicks
+    if (isSelectingTransaction) {
+      return
+    }
+    
+    setIsSelectingTransaction(true)
+    
+    // Set the transaction first
+    setSelectedTransaction(transaction)
+    
+    // Open the appropriate modal immediately
+    if (transaction.status === 'PENDING') {
+      setShowVerificationModal(true)
+    } else {
+      setShowDetailModal(true)
+    }
+    
+    // Re-enable selection after modal is fully open
+    setTimeout(() => {
+      setIsSelectingTransaction(false)
+    }, 300)
+  }, [isSelectingTransaction])
+
+  const handleDetailModalClose = useCallback(() => {
     setShowDetailModal(false)
     setSelectedTransaction(null)
-  }
+  }, [])
 
-  const handlePaymentModalClose = () => {
+  const handleVerificationModalClose = useCallback(() => {
+    setShowVerificationModal(false)
+    setSelectedTransaction(null)
+  }, [])
+
+  const handlePaymentModalClose = useCallback(() => {
     // Payment modal is controlled by the TransactionList component
-  }
+  }, [])
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -198,6 +226,32 @@ export default function TransactionsPage() {
   }
 
   const connectionStatus = getConnectionStatusDisplay()
+
+  // Clean up state when transactions change or component unmounts
+  useEffect(() => {
+    return () => {
+      // Only cleanup if not selecting
+      if (!isSelectingTransaction) {
+        setSelectedTransaction(null)
+        setShowDetailModal(false)
+        setShowVerificationModal(false)
+      }
+    }
+  }, [isSelectingTransaction])
+
+  // Reset selection state when transactions change
+  useEffect(() => {
+    
+    // Only reset if we have a selected transaction and it's no longer in the list
+    if (selectedTransaction && !transactions.find(t => t.id === selectedTransaction?.id)) {
+      // Don't reset if we're currently showing a modal
+      if (!showDetailModal && !showVerificationModal) {
+        setSelectedTransaction(null)
+      }
+    }
+  }, [transactions, selectedTransaction, showDetailModal, showVerificationModal])
+
+  // Remove the debounced state section since we're using simple state now
 
   return (
     <div className="space-y-6">
@@ -274,8 +328,10 @@ export default function TransactionsPage() {
         isLoading={isLoading}
         selectedTransaction={selectedTransaction}
         showDetailModal={showDetailModal}
+        showVerificationModal={showVerificationModal}
         onTransactionSelect={handleTransactionSelect}
         onDetailModalClose={handleDetailModalClose}
+        onVerificationModalClose={handleVerificationModalClose}
         onPaymentModalClose={handlePaymentModalClose}
         onApproveEarn={handleApproveEarn}
         onRejectEarn={handleRejectEarn}

@@ -27,12 +27,16 @@ class WebSocketManager {
 
   connect(url: string): void {
     if (this.socket?.connected || this.connectionState === 'connecting') {
-      console.log('WebSocket already connected or connecting')
       return
     }
 
+    // If we have a socket but it's not connected, disconnect it first
+    if (this.socket) {
+      this.socket.disconnect()
+      this.socket = null
+    }
+
     this.connectionState = 'connecting'
-    console.log('Connecting to Socket.IO at:', url)
 
     try {
       this.socket = io(url, {
@@ -41,7 +45,7 @@ class WebSocketManager {
         autoConnect: true,
         reconnection: false, // We'll handle reconnection manually
         timeout: 20000,
-        forceNew: true
+        forceNew: false // Changed from true to prevent multiple connections
       })
 
       this.setupEventListeners()
@@ -55,7 +59,6 @@ class WebSocketManager {
     if (!this.socket) return
 
     this.socket.on('connect', () => {
-      console.log('Socket.IO connected successfully')
       this.connectionState = 'connected'
       this.reconnectAttempts = 0
       
@@ -64,7 +67,6 @@ class WebSocketManager {
     })
 
     this.socket.on('disconnect', (reason) => {
-      console.log('Socket.IO disconnected:', reason)
       this.connectionState = 'disconnected'
       
       // Notify all listeners
@@ -94,14 +96,12 @@ class WebSocketManager {
         data: args[0] || {}
       }
       
-      console.log('Socket.IO message received:', message)
       this.notifyListeners('message', message)
     })
   }
 
   private scheduleReconnect(): void {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.log('Max reconnection attempts reached')
       return
     }
 
@@ -112,8 +112,6 @@ class WebSocketManager {
     const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 10000)
     this.reconnectAttempts++
 
-    console.log(`Scheduling reconnect attempt ${this.reconnectAttempts} in ${delay}ms`)
-    
     this.reconnectTimeout = setTimeout(() => {
       if (this.connectionState === 'disconnected') {
         // Store the URL when connecting for reconnection
@@ -154,11 +152,9 @@ class WebSocketManager {
 
   sendMessage(message: WebSocketMessage): boolean {
     if (this.socket?.connected) {
-      console.log('Sending Socket.IO message:', message)
       this.socket.emit(message.type, message.data)
       return true
     }
-    console.warn('Socket.IO is not connected, cannot send message')
     return false
   }
 
@@ -192,10 +188,14 @@ export function useWebSocket(url: string) {
   const [isConnected, setIsConnected] = useState(manager.isConnected())
   const [connectionState, setConnectionState] = useState(manager.getConnectionState())
   const [lastMessage, setLastMessage] = useState<WebSocketMessage | null>(null)
+  const urlRef = useRef(url)
 
   useEffect(() => {
-    // Connect when hook mounts
-    manager.connect(url)
+    // Only connect if URL changed or not already connected
+    if (urlRef.current !== url || !manager.isConnected()) {
+      urlRef.current = url
+      manager.connect(url)
+    }
 
     // Set up listeners
     const handleConnect = (message: WebSocketMessage) => {
@@ -228,7 +228,7 @@ export function useWebSocket(url: string) {
       manager.removeListener('message', handleMessage)
       manager.removeListener('error', handleError)
     }
-  }, [url])
+  }, []) // Remove url dependency to prevent reconnections
 
   const sendMessage = useCallback((message: WebSocketMessage) => {
     return manager.sendMessage(message)
@@ -259,7 +259,6 @@ export function useAdminWebSocket() {
   const [connectionError, setConnectionError] = useState<string | null>(null)
 
   const handleMessage = useCallback((message: WebSocketMessage) => {
-    console.log('Admin Socket.IO message received:', message);
     
     switch (message.type) {
       case 'admin_dashboard_update':
@@ -273,19 +272,15 @@ export function useAdminWebSocket() {
         break
         
       case 'PAYMENT_PROCESSED':
-        console.log('Payment processed:', message.data)
         break
         
       case 'balance_updated':
-        console.log('Balance updated:', message.data)
         break
         
       case 'transaction_status_changed':
-        console.log('Transaction status changed:', message.data)
         break
         
       default:
-        console.log('Unknown message type:', message.type)
         break
     }
   }, [])
@@ -294,12 +289,6 @@ export function useAdminWebSocket() {
   const wsUrl = process.env.NEXT_PUBLIC_WS_URL ? 
     process.env.NEXT_PUBLIC_WS_URL : 
     'ws://localhost:3001'
-  
-  console.log('Admin Socket.IO connecting to:', wsUrl)
-  console.log('Environment variables:', {
-    NEXT_PUBLIC_WS_URL: process.env.NEXT_PUBLIC_WS_URL,
-    NODE_ENV: process.env.NODE_ENV
-  })
 
   const { isConnected, connectionState, sendMessage } = useWebSocket(wsUrl)
 

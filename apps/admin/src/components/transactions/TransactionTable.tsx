@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { 
   EyeIcon, 
   CheckCircleIcon, 
@@ -51,6 +51,19 @@ export function TransactionTable({
   const [adminNotes, setAdminNotes] = useState('')
   const [rejectionReason, setRejectionReason] = useState('')
   const [paymentTransactionId, setPaymentTransactionId] = useState('')
+  const [isRowClickable, setIsRowClickable] = useState(true)
+
+  // Cleanup effect to reset state when component unmounts or props change
+  useEffect(() => {
+    return () => {
+      setIsRowClickable(true)
+    }
+  }, [])
+
+  // Reset row clickability when onTransactionSelect changes
+  useEffect(() => {
+    setIsRowClickable(true)
+  }, [onTransactionSelect])
 
   const handleSort = (field: keyof CoinTransaction) => {
     if (sortField === field) {
@@ -169,6 +182,21 @@ export function TransactionTable({
     return transaction.type === 'REDEEM' && transaction.status === 'APPROVED'
   }
 
+  const handleRowClick = useCallback((transaction: CoinTransaction) => {
+    if (!isRowClickable || !onTransactionSelect) return
+    
+    // Immediately disable row clicks to prevent rapid successive clicks
+    setIsRowClickable(false)
+    
+    // Call the parent handler immediately
+    onTransactionSelect(transaction)
+    
+    // Re-enable row clicks after modal is fully open
+    setTimeout(() => {
+      setIsRowClickable(true)
+    }, 500) // Reduced from 800ms to 500ms
+  }, [onTransactionSelect, isRowClickable])
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -218,7 +246,20 @@ export function TransactionTable({
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {sortedTransactions.map((transaction) => (
-              <tr key={transaction.id} className="hover:bg-gray-50">
+              <tr 
+                key={transaction.id} 
+                className={`transition-all duration-150 ${
+                  transaction.status === 'PENDING' ? 'border-l-4 border-l-blue-500' : ''
+                } ${
+                  isRowClickable 
+                    ? 'hover:bg-blue-50 cursor-pointer' 
+                    : 'cursor-not-allowed opacity-75'
+                } ${
+                  !isRowClickable ? 'pointer-events-none' : ''
+                }`}
+                onClick={() => handleRowClick(transaction)}
+                title={transaction.status === 'PENDING' ? 'Click to verify receipt' : 'Click to view details'}
+              >
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                   {new Date(transaction.createdAt).toLocaleDateString()}
                 </td>
@@ -248,46 +289,32 @@ export function TransactionTable({
                   <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(transaction.status)}`}>
                     {getStatusIcon(transaction.status)}
                     <span className="ml-1">{transaction.status}</span>
+                    {transaction.status === 'PENDING' && (
+                      <span className="ml-2 text-blue-600 text-xs">(Click to verify)</span>
+                    )}
+                    {!isRowClickable && (
+                      <span className="ml-2 text-gray-500 text-xs">(Processing...)</span>
+                    )}
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                   <div className="flex space-x-2">
                     {onView && (
                       <button
-                        onClick={() => onView(transaction)}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onView(transaction)
+                        }}
                         className="text-indigo-600 hover:text-indigo-900 p-1 rounded hover:bg-indigo-50"
                         title="View Details"
                       >
                         <EyeIcon className="w-4 h-4" />
                       </button>
                     )}
-                    {canApprove(transaction) && (
-                      <button
-                        onClick={() => {
-                          setSelectedTransaction(transaction)
-                          setActionType('approve')
-                        }}
-                        className="text-green-600 hover:text-green-900 p-1 rounded hover:bg-green-50"
-                        title="Approve"
-                      >
-                        <CheckCircleIcon className="w-4 h-4" />
-                      </button>
-                    )}
-                    {canReject(transaction) && (
-                      <button
-                        onClick={() => {
-                          setSelectedTransaction(transaction)
-                          setActionType('reject')
-                        }}
-                        className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50"
-                        title="Reject"
-                      >
-                        <XCircleIcon className="w-4 h-4" />
-                      </button>
-                    )}
                     {canProcessPayment(transaction) && (
                       <button
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation()
                           setSelectedTransaction(transaction)
                           setActionType('payment')
                         }}

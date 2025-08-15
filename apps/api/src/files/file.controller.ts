@@ -6,9 +6,17 @@ import {
   Request,
   Logger,
   BadRequestException,
+  Get,
+  Param,
+  Res,
+  HttpException,
+  HttpStatus,
+  Options,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { FileService } from './file.service';
+import { Response } from 'express';
+import axios from 'axios';
 
 export interface GetUploadUrlDto {
   fileName: string;
@@ -95,5 +103,56 @@ export class FileController {
       this.logger.error(`Failed to validate receipt for user ${userId}: ${error.message}`);
       throw error;
     }
+  }
+
+  @Get('receipt-image/:fileKey')
+  async getReceiptImage(@Param('fileKey') fileKey: string, @Res() res: Response) {
+    try {
+      const file = await this.fileService.getReceiptImage(fileKey);
+
+      if (!file) {
+        throw new HttpException('Receipt image not found', HttpStatus.NOT_FOUND);
+      }
+
+      res.setHeader('Content-Type', file.fileType);
+      res.setHeader('Content-Disposition', `inline; filename="${file.fileName}"`);
+      res.send(file.fileContent);
+    } catch (error) {
+      this.logger.error(`Failed to serve receipt image for fileKey ${fileKey}: ${error.message}`);
+      throw error;
+    }
+  }
+
+  @Get('public/receipt-image/:fileKey')
+  async getPublicReceiptImage(@Param('fileKey') fileKey: string, @Res() res: Response) {
+    try {
+      const file = await this.fileService.getReceiptImage(fileKey);
+
+      if (!file) {
+        throw new HttpException('Receipt image not found', HttpStatus.NOT_FOUND);
+      }
+
+      // Set CORS headers for public access
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+      res.setHeader('Content-Type', file.fileType);
+      res.setHeader('Content-Disposition', `inline; filename="${file.fileName}"`);
+      res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
+      res.send(file.fileContent);
+    } catch (error) {
+      this.logger.error(`Failed to serve public receipt image for fileKey ${fileKey}: ${error.message}`);
+      throw error;
+    }
+  }
+
+  @Options('public/receipt-image/:fileKey')
+  async optionsPublicReceiptImage(@Param('fileKey') fileKey: string, @Res() res: Response) {
+    // Handle preflight CORS request
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Access-Control-Max-Age', '86400'); // Cache preflight for 24 hours
+    res.status(200).send();
   }
 }

@@ -20,17 +20,12 @@ export class BrandsService {
   async create(createBrandDto: CreateBrandDto): Promise<Brand> {
     // Validate that category exists if provided
     if (createBrandDto.categoryId) {
-      try {
-        const category = await this.categoryRepository.findOne({
-          where: { id: createBrandDto.categoryId },
-        });
+      const category = await this.categoryRepository.findOne({
+        where: { id: createBrandDto.categoryId },
+      });
 
-        if (!category) {
-          throw new NotFoundException('Brand category not found');
-        }
-      } catch (error) {
-        // If category validation fails, continue without category
-        createBrandDto.categoryId = null;
+      if (!category) {
+        throw new NotFoundException('Brand category not found');
       }
     }
 
@@ -46,11 +41,31 @@ export class BrandsService {
     const skip = (page - 1) * limit;
 
     try {
-      // Simple query without joins to avoid database constraint issues
+      // Build query with proper joins for category information
       let queryBuilder = this.brandRepository
         .createQueryBuilder('brand')
-        .select(['brand.id', 'brand.name', 'brand.description', 'brand.logoUrl', 'brand.categoryId', 'brand.earningPercentage', 'brand.redemptionPercentage', 'brand.minRedemptionAmount', 'brand.maxRedemptionAmount', 'brand.isActive', 'brand.createdAt', 'brand.updatedAt'])
-        .where('1=1'); // Start with a simple condition
+        .leftJoinAndSelect('brand.category', 'category')
+        .select([
+          'brand.id',
+          'brand.name',
+          'brand.description',
+          'brand.logoUrl',
+          'brand.categoryId',
+          'brand.earningPercentage',
+          'brand.redemptionPercentage',
+          'brand.minRedemptionAmount',
+          'brand.maxRedemptionAmount',
+          'brand.brandwiseMaxCap',
+          'brand.isActive',
+          'brand.createdAt',
+          'brand.updatedAt',
+          'category.id',
+          'category.name',
+          'category.description',
+          'category.icon',
+          'category.color'
+        ])
+        .where('1=1');
 
       if (categoryId) {
         queryBuilder = queryBuilder.andWhere('brand.categoryId = :categoryId', { categoryId });
@@ -83,16 +98,65 @@ export class BrandsService {
         totalPages,
       };
     } catch (error) {
-      // If the query fails, return empty result
       console.error('Brands query failed:', error);
-      return {
-        data: [],
-        total: 0,
-        page,
-        limit,
-        totalPages: 0,
-      };
+      // Fallback to simple query without joins
+      return this.findAllFallback(searchDto);
     }
+  }
+
+  private async findAllFallback(searchDto: BrandSearchDto): Promise<BrandListResponseDto> {
+    const { query, categoryId, isActive, page = 1, limit = 20 } = searchDto;
+    const skip = (page - 1) * limit;
+
+    let queryBuilder = this.brandRepository
+      .createQueryBuilder('brand')
+      .select([
+        'brand.id',
+        'brand.name',
+        'brand.description',
+        'brand.logoUrl',
+        'brand.categoryId',
+        'brand.earningPercentage',
+        'brand.redemptionPercentage',
+        'brand.minRedemptionAmount',
+        'brand.maxRedemptionAmount',
+        'brand.brandwiseMaxCap',
+        'brand.isActive',
+        'brand.createdAt',
+        'brand.updatedAt'
+      ])
+      .where('1=1');
+
+    if (categoryId) {
+      queryBuilder = queryBuilder.andWhere('brand.categoryId = :categoryId', { categoryId });
+    }
+
+    if (isActive !== undefined) {
+      queryBuilder = queryBuilder.andWhere('brand.isActive = :isActive', { isActive });
+    }
+
+    if (query) {
+      queryBuilder = queryBuilder.andWhere(
+        '(brand.name ILIKE :query OR brand.description ILIKE :query)',
+        { query: `%${query}%` }
+      );
+    }
+
+    const [brands, total] = await queryBuilder
+      .skip(skip)
+      .take(limit)
+      .orderBy('brand.name', 'ASC')
+      .getManyAndCount();
+
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      data: brands,
+      total,
+      page,
+      limit,
+      totalPages,
+    };
   }
 
   async findOne(id: string): Promise<Brand> {
@@ -126,22 +190,20 @@ export class BrandsService {
 
     // If category is being updated, validate it exists
     if (updateBrandDto.categoryId && updateBrandDto.categoryId !== brand.categoryId) {
-      try {
-        const category = await this.categoryRepository.findOne({
-          where: { id: updateBrandDto.categoryId },
-        });
+      const category = await this.categoryRepository.findOne({
+        where: { id: updateBrandDto.categoryId },
+      });
 
-        if (!category) {
-          throw new NotFoundException('Brand category not found');
-        }
-      } catch (error) {
-        // If category validation fails, continue without category
-        updateBrandDto.categoryId = null;
+      if (!category) {
+        throw new NotFoundException('Brand category not found');
       }
     }
 
     // Validate business rules if percentages are being updated
-    if (updateBrandDto.earningPercentage !== undefined || updateBrandDto.redemptionPercentage !== undefined) {
+    if (updateBrandDto.earningPercentage !== undefined || 
+        updateBrandDto.redemptionPercentage !== undefined ||
+        updateBrandDto.minRedemptionAmount !== undefined ||
+        updateBrandDto.maxRedemptionAmount !== undefined) {
       const updatedData = { ...brand, ...updateBrandDto };
       this.validateBrandBusinessRules(updatedData);
     }
@@ -222,19 +284,28 @@ export class BrandsService {
     }
 
     if (earningPercentage !== undefined && redemptionPercentage !== undefined) {
-          if (earningPercentage + redemptionPercentage > 100) {
-      throw new BadRequestException(
-        `Invalid percentages: earning ${earningPercentage}% + redemption ${redemptionPercentage}% = ${earningPercentage + redemptionPercentage}% (max 100%)`
-      );
-    }
+      if (earningPercentage + redemptionPercentage > 100) {
+        throw new BadRequestException(
+          `Invalid percentages: earning ${earningPercentage}% + redemption ${redemptionPercentage}% = ${earningPercentage + redemptionPercentage}% (max 100%)`
+        );
+      }
     }
 
     if (minRedemptionAmount !== undefined && maxRedemptionAmount !== undefined) {
-          if (maxRedemptionAmount < minRedemptionAmount) {
-      throw new BadRequestException(
-        `Invalid redemption amounts: min ${minRedemptionAmount} > max ${maxRedemptionAmount}`
-      );
+      if (maxRedemptionAmount < minRedemptionAmount) {
+        throw new BadRequestException(
+          `Invalid redemption amounts: min ${minRedemptionAmount} > max ${maxRedemptionAmount}`
+        );
+      }
     }
+
+    // Ensure maxRedemptionAmount and brandwiseMaxCap are consistent
+    if (maxRedemptionAmount !== undefined && brandData.brandwiseMaxCap !== undefined) {
+      if (maxRedemptionAmount !== brandData.brandwiseMaxCap) {
+        throw new BadRequestException(
+          'Max redemption amount must equal brandwise max cap for consistency'
+        );
+      }
     }
   }
 }

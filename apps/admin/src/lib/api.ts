@@ -75,6 +75,37 @@ export const transactionApi = {
       `/admin/coins/transactions?page=${page}&limit=${limit}${userId ? `&userId=${userId}` : ''}`
     ),
 
+  // Get user pending requests for verification navigation
+  getUserPendingRequests: (userId: string) =>
+    apiRequest<{ success: boolean, message: string, data: { data: CoinTransaction[], total: number, page: number, limit: number, totalPages: number } }>(
+      `/admin/coins/users/${userId}/pending-requests`
+    ),
+
+  // Get user details for verification form
+  getUserDetails: (userId: string) =>
+    apiRequest<{ success: boolean, message: string, data: { user: any } }>(
+      `/admin/coins/users/${userId}/details`
+    ),
+
+  // Get complete user verification data (user details + pending requests)
+  getUserVerificationData: (userId: string) =>
+    apiRequest<{ 
+      success: boolean, 
+      message: string, 
+      data: { 
+        user: any, 
+        pendingRequests: { 
+          data: any[], 
+          total: number, 
+          page: number, 
+          limit: number, 
+          totalPages: number 
+        } 
+      } 
+    }>(
+      `/admin/coins/users/${userId}/verification-data`
+    ),
+
   // Approve earn transaction
   approveEarnTransaction: (id: string, adminUserId: string, adminNotes?: string) =>
     apiRequest<{ success: boolean, message: string, data: { transaction: CoinTransaction } }>(
@@ -87,7 +118,7 @@ export const transactionApi = {
 
   // Reject earn transaction
   rejectEarnTransaction: (id: string, adminUserId: string, adminNotes: string) =>
-    apiRequest<{ success: boolean, message: string, data: { transaction: CoinTransaction } }>(
+    apiRequest<{ success: boolean, message: string, data: { transactionId: string, adminNotes: string } }>(
       `/admin/coins/transactions/${id}/reject`,
       {
         method: 'PUT',
@@ -169,7 +200,7 @@ export const brandApi = {
     if (categoryId) params.append('categoryId', categoryId)
     if (isActive !== undefined) params.append('isActive', isActive.toString())
     
-    return apiRequest<{ brands: Brand[], total: number, page: number, limit: number, totalPages: number }>(
+    return apiRequest<{ data: Brand[], total: number, page: number, limit: number, totalPages: number }>(
       `/brands?${params.toString()}`
     )
   },

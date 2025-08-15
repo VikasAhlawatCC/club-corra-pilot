@@ -32,6 +32,6 @@ export class BrandCategory {
   updatedAt: Date;
 
   // Relationships
-  // Note: Brand relationship is commented out in Brand entity
-  // brands: Brand[];
+  @OneToMany(() => Brand, (brand) => brand.category)
+  brands: Brand[];
 }

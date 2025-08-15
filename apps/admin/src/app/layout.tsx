@@ -23,14 +23,14 @@ export default function RootLayout({
       <body className={inter.className}>
         <ErrorBoundary>
           <AuthProvider>
-            <AuthGuard>
-              <div className="min-h-screen bg-background">
+            <div className="min-h-screen bg-background">
+              <AuthGuard>
                 <AdminNavigation />
                 <main className="flex-1 p-6">
                   {children}
                 </main>
-              </div>
-            </AuthGuard>
+              </AuthGuard>
+            </div>
           </AuthProvider>
         </ErrorBoundary>
       </body>

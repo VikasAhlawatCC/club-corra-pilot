@@ -286,32 +286,29 @@ export class CoinsService {
     adminUserId: string,
     adminNotes?: string,
   ): Promise<CoinTransaction> {
-    const transaction = await this.transactionApprovalService.approveRedeemTransaction(
+    // Validate that user can have redeem request approved
+    const transaction = await this.transactionRepository.findOne({
+      where: { id: transactionId },
+      relations: ['user', 'brand'],
+    });
+
+    if (!transaction) {
+      throw new NotFoundException('Transaction not found');
+    }
+
+    // Check if user has all pending earn requests verified
+    const canApprove = await this.canApproveRedeemRequest(transaction.userId);
+    if (!canApprove) {
+      throw new BadRequestException(
+        'Cannot approve redeem request. User has pending earn requests that must be processed first.',
+      );
+    }
+
+    return await this.transactionApprovalService.approveRedeemTransaction(
       transactionId,
       adminUserId,
       adminNotes,
     );
-
-    // Send real-time balance update
-    const userBalance = await this.getUserBalance(transaction.userId);
-    await this.connectionManager.sendRealTimeBalanceUpdate(
-      transaction.userId,
-      userBalance.balance,
-      transaction.id,
-      'REDEEM',
-      'PROCESSED',
-    );
-
-    // Send transaction approval notification
-    await this.connectionManager.sendTransactionApprovalNotification(
-      transaction.userId,
-      transaction.id,
-      'REDEEM',
-      'PROCESSED',
-      adminNotes,
-    );
-
-    return transaction;
   }
 
   async rejectRedeemTransaction(
@@ -442,5 +439,52 @@ export class CoinsService {
     };
 
     return summary;
+  }
+
+  /**
+   * Get all pending requests for a specific user
+   */
+  async getUserPendingRequests(userId: string) {
+    const [transactions, total] = await this.transactionRepository.findAndCount({
+      where: { userId, status: 'PENDING' },
+      relations: ['brand', 'user'],
+      order: { createdAt: 'ASC' },
+    });
+
+    return {
+      data: transactions,
+      total,
+      page: 1,
+      limit: total,
+      totalPages: 1,
+    };
+  }
+
+  /**
+   * Get user details for verification form
+   */
+  async getUserDetails(userId: string) {
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      relations: ['profile', 'paymentDetails'],
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    return user;
+  }
+
+  /**
+   * Validate if user can have redeem request approved
+   * User must have all pending earn requests verified before redeem approval
+   */
+  async canApproveRedeemRequest(userId: string): Promise<boolean> {
+    const pendingEarnRequests = await this.transactionRepository.count({
+      where: { userId, type: 'EARN', status: 'PENDING' },
+    });
+
+    return pendingEarnRequests === 0;
   }
 }

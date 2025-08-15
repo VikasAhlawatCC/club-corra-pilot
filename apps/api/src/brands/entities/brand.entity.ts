@@ -55,9 +55,9 @@ export class Brand {
   updatedAt: Date;
 
   // Relationships
-  // @ManyToOne(() => BrandCategory, (category) => category.brands)
-  // @JoinColumn({ name: 'categoryId' })
-  // category: BrandCategory;
+  @ManyToOne(() => BrandCategory, (category) => category.brands)
+  @JoinColumn({ name: 'categoryId' })
+  category: BrandCategory;
 
   @OneToMany(() => CoinTransaction, (transaction) => transaction.brand)
   transactions: CoinTransaction[];

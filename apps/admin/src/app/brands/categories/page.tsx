@@ -3,12 +3,17 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { PlusIcon, PencilIcon, TrashIcon, EyeIcon } from '@heroicons/react/24/outline'
-import { categoryApi } from '@/lib/api'
+import { categoryApi, brandApi } from '@/lib/api'
 import { useToast } from '@/components/common'
+import { CategoryModal } from '@/components/brands/CategoryModal'
 import type { BrandCategory, CreateBrandCategoryRequest, UpdateBrandCategoryRequest } from '@shared/schemas'
 
+interface CategoryWithBrandCount extends BrandCategory {
+  brandCount: number
+}
+
 export default function CategoriesPage() {
-  const [categories, setCategories] = useState<BrandCategory[]>([])
+  const [categories, setCategories] = useState<CategoryWithBrandCount[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [editingCategory, setEditingCategory] = useState<BrandCategory | null>(null)
@@ -22,8 +27,18 @@ export default function CategoriesPage() {
   const fetchCategories = async () => {
     try {
       setIsLoading(true)
-      const response = await categoryApi.getAllCategories()
-      setCategories(response)
+      const [categoriesResponse, brandsResponse] = await Promise.all([
+        categoryApi.getAllCategories(),
+        brandApi.getAllBrands(1, 1000) // Get all brands to count
+      ])
+      
+      // Map categories with brand counts
+      const categoriesWithCounts = categoriesResponse.map(category => ({
+        ...category,
+        brandCount: brandsResponse.data.filter(brand => brand.categoryId === category.id).length
+      }))
+      
+      setCategories(categoriesWithCounts)
     } catch (error) {
       console.error('Failed to fetch categories:', error)
       showError('Failed to fetch categories')
@@ -65,18 +80,6 @@ export default function CategoriesPage() {
     } catch (error) {
       console.error('Failed to delete category:', error)
       showError('Failed to delete category')
-    }
-  }
-
-  const handleToggleStatus = async (category: BrandCategory) => {
-    try {
-      // Note: This would need to be implemented in the backend
-      // For now, we'll just show a message
-      showSuccess('Category status updated')
-      fetchCategories()
-    } catch (error) {
-      console.error('Failed to update category status:', error)
-      showError('Failed to update category status')
     }
   }
 
@@ -193,8 +196,13 @@ export default function CategoriesPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900">
-                          {/* TODO: Get brand count from API */}
-                          —
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            category.brandCount > 0 
+                              ? 'bg-blue-100 text-blue-800' 
+                              : 'bg-gray-100 text-gray-800'
+                          }`}>
+                            {category.brandCount} {category.brandCount === 1 ? 'brand' : 'brands'}
+                          </span>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -202,14 +210,17 @@ export default function CategoriesPage() {
                           <button
                             onClick={() => setEditingCategory(category)}
                             className="text-indigo-600 hover:text-indigo-900"
+                            title="Edit category"
                           >
                             <PencilIcon className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => setShowDeleteModal(category.id)}
                             className="text-red-600 hover:text-red-900"
+                            title="Delete category"
+                            disabled={category.brandCount > 0}
                           >
-                            <TrashIcon className="w-4 h-4" />
+                            <TrashIcon className={`w-4 h-4 ${category.brandCount > 0 ? 'opacity-50 cursor-not-allowed' : ''}`} />
                           </button>
                         </div>
                       </td>
@@ -222,29 +233,32 @@ export default function CategoriesPage() {
         </div>
       </div>
 
-      {/* Create Category Modal */}
-      {showCreateModal && (
-        <CategoryModal
-          onClose={() => setShowCreateModal(false)}
-          onSubmit={handleCreateCategory}
-          mode="create"
-        />
-      )}
+             {/* Create Category Modal */}
+       {showCreateModal && (
+         <CategoryModal
+           mode="create"
+           isOpen={showCreateModal}
+           onClose={() => setShowCreateModal(false)}
+           onSubmit={handleCreateCategory}
+         />
+       )}
 
-      {/* Edit Category Modal */}
-      {editingCategory && (
-        <CategoryModal
-          onClose={() => setEditingCategory(null)}
-          onSubmit={(data) => handleUpdateCategory(editingCategory.id, data)}
-          mode="edit"
-          category={editingCategory}
-        />
-      )}
+       {/* Edit Category Modal */}
+       {editingCategory && (
+         <CategoryModal
+           mode="edit"
+           category={editingCategory}
+           isOpen={true}
+           onClose={() => setEditingCategory(null)}
+           onSubmit={(data) => handleUpdateCategory(editingCategory.id, data)}
+         />
+       )}
 
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (
         <DeleteConfirmationModal
           categoryName={categories.find(c => c.id === showDeleteModal)?.name || ''}
+          brandCount={categories.find(c => c.id === showDeleteModal)?.brandCount || 0}
           onConfirm={() => handleDeleteCategory(showDeleteModal)}
           onCancel={() => setShowDeleteModal(null)}
         />
@@ -253,127 +267,49 @@ export default function CategoriesPage() {
   )
 }
 
-// Category Modal Component
-interface CategoryModalProps {
-  onClose: () => void
-  onSubmit: (data: any) => Promise<void> | void
-  mode: 'create' | 'edit'
-  category?: BrandCategory
-}
 
-function CategoryModal({ onClose, onSubmit, mode, category }: CategoryModalProps) {
-  const [formData, setFormData] = useState({
-    name: category?.name || '',
-    description: category?.description || '',
-    icon: category?.icon || '',
-    color: category?.color || '#3B82F6'
-  })
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    onSubmit(formData)
-  }
-
-  return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-      <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-        <div className="mt-3">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">
-            {mode === 'create' ? 'Create Category' : 'Edit Category'}
-          </h3>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Name</label>
-              <input
-                type="text"
-                required
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Description</label>
-              <textarea
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                rows={3}
-                className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Icon</label>
-              <input
-                type="text"
-                value={formData.icon}
-                onChange={(e) => setFormData({ ...formData, icon: e.target.value })}
-                placeholder="heroicon name"
-                className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Color</label>
-              <input
-                type="color"
-                value={formData.color}
-                onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                className="mt-1 block w-full h-10 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-              />
-            </div>
-            <div className="flex justify-end space-x-3 pt-4">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                {mode === 'create' ? 'Create' : 'Update'}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
-  )
-}
 
 // Delete Confirmation Modal
 interface DeleteConfirmationModalProps {
   categoryName: string
+  brandCount: number
   onConfirm: () => void
   onCancel: () => void
 }
 
-function DeleteConfirmationModal({ categoryName, onConfirm, onCancel }: DeleteConfirmationModalProps) {
+function DeleteConfirmationModal({ categoryName, brandCount, onConfirm, onCancel }: DeleteConfirmationModalProps) {
+  const canDelete = brandCount === 0
+
   return (
     <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
       <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
         <div className="mt-3 text-center">
           <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
-            <TrashIcon className="h-6 w-6 text-red-600" />
+            <TrashIcon className="w-6 h-6 text-red-600" />
           </div>
           <h3 className="text-lg font-medium text-gray-900 mt-4">Delete Category</h3>
           <p className="text-sm text-gray-500 mt-2">
-            Are you sure you want to delete "{categoryName}"? This action cannot be undone.
+            {canDelete ? (
+              `Are you sure you want to delete "${categoryName}"? This action cannot be undone.`
+            ) : (
+              `Cannot delete "${categoryName}" because it has ${brandCount} associated brand${brandCount === 1 ? '' : 's'}. Please remove or reassign the brands first.`
+            )}
           </p>
           <div className="flex justify-center space-x-3 mt-6">
             <button
               onClick={onCancel}
               className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
             >
-              Cancel
+              {canDelete ? 'Cancel' : 'Close'}
             </button>
-            <button
-              onClick={onConfirm}
-              className="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-            >
-              Delete
-            </button>
+            {canDelete && (
+              <button
+                onClick={onConfirm}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+              >
+                Delete
+              </button>
+            )}
           </div>
         </div>
       </div>
