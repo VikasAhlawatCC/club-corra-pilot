@@ -10,13 +10,11 @@ import {
   passwordResetRequestSchema,
   passwordResetSchema
 } from '@shared/schemas';
+import { environment } from '../config/environment';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Normalize API base URL to include Nest global prefix `/api/v1`
-const RAW_API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.4:3001';
-const API_BASE_URL = RAW_API_BASE_URL.endsWith('/api/v1')
-  ? RAW_API_BASE_URL
-  : `${RAW_API_BASE_URL.replace(/\/$/, '')}/api/v1`;
+// Use environment configuration
+const API_BASE_URL = environment.apiBaseUrl;
 
 class AuthService {
   private async makeRequest<T>(
@@ -853,21 +851,26 @@ class AuthService {
    */
   async checkServerHealth(): Promise<{ isReachable: boolean; message: string }> {
     try {
-      // Use the base server URL (without /api/v1) for health check
-      const baseUrl = API_BASE_URL.replace('/api/v1', '');
-      const healthUrl = `${baseUrl}/api/v1/health`;
+      // Use the API base URL directly for health check
+      const healthUrl = `${API_BASE_URL}/health`;
       console.log('[DEBUG] Checking server health at:', healthUrl);
       
-      const response = await fetch(healthUrl, {
+      // Create a timeout promise for health check
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Request timeout')), 10000);
+      });
+      
+      const fetchPromise = fetch(healthUrl, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
           'X-Platform': 'mobile',
           'X-Client-Type': 'mobile',
         },
-        // Short timeout for health check
-        signal: AbortSignal.timeout(5000),
       });
+      
+      // Race between fetch and timeout
+      const response = await Promise.race([fetchPromise, timeoutPromise]) as Response;
       
       if (response.ok) {
         // Check the response body status as well
@@ -890,16 +893,22 @@ class AuthService {
       console.log('[DEBUG] Server health check failed:', error);
       
       if (error instanceof Error) {
-        if (error.name === 'AbortError') {
-          return { isReachable: false, message: 'Server health check timed out' };
+        if (error.message.includes('Request timeout')) {
+          return { isReachable: false, message: 'Server health check timed out. Please check your network connection.' };
         } else if (error.message.includes('Network request failed')) {
-          return { isReachable: false, message: 'Unable to reach server. Check your network connection.' };
+          return { isReachable: false, message: 'Unable to reach server. Please check your internet connection and ensure you\'re on the same network as the server.' };
         } else if (error.message.includes('fetch')) {
-          return { isReachable: false, message: 'Server is not accessible from this device.' };
+          return { isReachable: false, message: 'Server is not accessible from this device. Please check if the server is running and accessible.' };
+        } else if (error.message.includes('ECONNREFUSED')) {
+          return { isReachable: false, message: 'Connection refused. The server is not accessible. Please check if the server is running.' };
+        } else if (error.message.includes('ENOTFOUND')) {
+          return { isReachable: false, message: 'Server not found. Please check the server address and try again.' };
+        } else if (error.message.includes('ETIMEDOUT')) {
+          return { isReachable: false, message: 'Request timed out. Please check your internet connection and try again.' };
         }
       }
       
-      return { isReachable: false, message: 'Unknown error occurred while checking server' };
+      return { isReachable: false, message: `Server health check failed: ${error instanceof Error ? error.message : 'Unknown error'}` };
     }
   }
 

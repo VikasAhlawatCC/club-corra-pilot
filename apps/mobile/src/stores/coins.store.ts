@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { coinsService } from '../services/coins.service';
 import { balanceResponseSchema, transactionListResponseSchema, coinTransactionSchema } from '@shared/schemas';
 import type { z } from 'zod';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type BalanceResponse = z.infer<typeof balanceResponseSchema>;
 type TransactionListResponse = z.infer<typeof transactionListResponseSchema>;
@@ -44,9 +45,25 @@ export const useCoinsStore = create<CoinsState>((set, get) => ({
   fetchBalance: async () => {
     try {
       set({ isLoading: true, error: null });
+      console.log('[CoinsStore] Fetching balance...');
+      
+      // Check if we have authentication tokens
+      const authStorageData = await AsyncStorage.getItem('auth-storage');
+      if (!authStorageData) {
+        throw new Error('No authentication data found. Please login again.');
+      }
+      
+      const parsed = JSON.parse(authStorageData);
+      if (!parsed.state?.tokens?.accessToken) {
+        throw new Error('No access token found. Please login again.');
+      }
+      
+      console.log('[CoinsStore] Authentication verified, calling service...');
       const balance = await coinsService.getBalance();
+      console.log('[CoinsStore] Received balance from service:', balance);
       set({ balance, isLoading: false });
     } catch (error) {
+      console.error('[CoinsStore] Error in fetchBalance:', error);
       set({ 
         error: error instanceof Error ? error.message : 'Failed to fetch balance',
         isLoading: false 

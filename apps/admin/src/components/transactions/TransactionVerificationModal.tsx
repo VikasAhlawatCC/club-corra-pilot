@@ -91,6 +91,7 @@ export const TransactionVerificationModal = memo(function TransactionVerificatio
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isImageLoading, setIsImageLoading] = useState(false)
   const [imageLoadError, setImageLoadError] = useState(false)
+  const [keyboardFeedback, setKeyboardFeedback] = useState<string | null>(null)
 
   const onCloseRef = useRef(onClose)
   const pendingRequestsRef = useRef(pendingRequests)
@@ -168,94 +169,6 @@ export const TransactionVerificationModal = memo(function TransactionVerificatio
     }
   }
 
-  // Enhanced keyboard shortcuts with focus management
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (!isOpen) return
-      
-      switch (event.key) {
-        case 'Escape':
-          event.preventDefault()
-          onCloseRef.current()
-          break
-        case 'ArrowLeft':
-          event.preventDefault()
-          if (event.altKey) {
-            handleRequestNavigation('prev')
-          } else {
-            handleImageNavigation('prev')
-          }
-          break
-        case 'ArrowRight':
-          event.preventDefault()
-          if (event.altKey) {
-            handleRequestNavigation('next')
-          } else {
-            handleImageNavigation('next')
-          }
-          break
-        case '+':
-        case '=':
-          event.preventDefault()
-          handleZoom('in')
-          break
-        case '-':
-          event.preventDefault()
-          handleZoom('out')
-          break
-        case 'r':
-        case 'R':
-          event.preventDefault()
-          handleRotate()
-          break
-        case '0':
-          event.preventDefault()
-          handleReset()
-          break
-        case 'Tab':
-          // Ensure focus stays within modal
-          const focusableElements = document.querySelectorAll(
-            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-          )
-          const firstElement = focusableElements[0] as HTMLElement
-          const lastElement = focusableElements[focusableElements.length - 1] as HTMLElement
-          
-          if (event.shiftKey && document.activeElement === firstElement) {
-            event.preventDefault()
-            lastElement.focus()
-          } else if (!event.shiftKey && document.activeElement === lastElement) {
-            event.preventDefault()
-            firstElement.focus()
-          }
-          break
-        case 'Enter':
-          // Handle form submission with Enter key
-          if (event.target === document.activeElement) {
-            const target = event.target as HTMLElement
-            if (target.tagName === 'BUTTON' && !target.hasAttribute('disabled')) {
-              event.preventDefault()
-              target.click()
-            }
-          }
-          break
-      }
-    }
-
-    document.addEventListener('keydown', handleKeyDown)
-    
-    // Focus management: focus first focusable element when modal opens
-    if (isOpen) {
-      const firstFocusable = document.querySelector(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-      ) as HTMLElement
-      if (firstFocusable) {
-        setTimeout(() => firstFocusable.focus(), 100)
-      }
-    }
-    
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [isOpen]) // Removed problematic dependencies
-
   if (!isOpen || !transaction) {
     return null
   }
@@ -305,10 +218,11 @@ export const TransactionVerificationModal = memo(function TransactionVerificatio
   }, [pendingRequests, currentRequestIndex])
 
   const handleImageNavigation = useCallback((direction: 'prev' | 'next') => {
-    // TODO: Implement multiple image navigation when backend supports it
+    // Currently only one image is supported, so navigation is limited
+    // This function is kept for future extensibility when multiple images are supported
     if (direction === 'prev' && currentImageIndex > 0) {
       setCurrentImageIndex(prev => prev - 1)
-    } else if (direction === 'next' && currentImageIndex < 1) { // Fixed: check against actual image count
+    } else if (direction === 'next' && currentImageIndex < 0) { // Only one image (index 0)
       setCurrentImageIndex(prev => prev + 1)
     }
   }, [currentImageIndex])
@@ -455,6 +369,115 @@ export const TransactionVerificationModal = memo(function TransactionVerificatio
     hasMultipleRequests && currentRequestIndex < pendingRequests.length - 1
   , [hasMultipleRequests, currentRequestIndex, pendingRequests.length])
 
+  // Show keyboard shortcut feedback
+  const showKeyboardFeedback = useCallback((message: string) => {
+    setKeyboardFeedback(message)
+    setTimeout(() => setKeyboardFeedback(null), 1500)
+  }, [])
+
+  // Enhanced keyboard shortcuts with focus management
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!isOpen) return
+      
+      switch (event.key) {
+        case 'Escape':
+          event.preventDefault()
+          showKeyboardFeedback('Closing modal...')
+          setTimeout(() => onCloseRef.current(), 300) // Small delay to show feedback
+          break
+        case 'ArrowLeft':
+          event.preventDefault()
+          if (event.altKey) {
+            if (hasMultipleRequests) {
+              handleRequestNavigation('prev')
+              showKeyboardFeedback('Previous request')
+            }
+          } else {
+            // Only allow image navigation if multiple images are supported
+            // Currently disabled since only one image is supported
+            // handleImageNavigation('prev')
+          }
+          break
+        case 'ArrowRight':
+          event.preventDefault()
+          if (event.altKey) {
+            if (hasMultipleRequests) {
+              handleRequestNavigation('next')
+              showKeyboardFeedback('Next request')
+            }
+          } else {
+            // Only allow image navigation if multiple images are supported
+            // Currently disabled since only one image is supported
+            // handleImageNavigation('next')
+          }
+          break
+        case '+':
+        case '=':
+          event.preventDefault()
+          handleZoom('in')
+          showKeyboardFeedback('Zoomed in')
+          break
+        case '-':
+          event.preventDefault()
+          handleZoom('out')
+          showKeyboardFeedback('Zoomed out')
+          break
+        case 'r':
+        case 'R':
+          event.preventDefault()
+          handleRotate()
+          showKeyboardFeedback('Image rotated')
+          break
+        case '0':
+          event.preventDefault()
+          handleReset()
+          showKeyboardFeedback('Image reset')
+          break
+        case 'Tab':
+          // Ensure focus stays within modal
+          const focusableElements = document.querySelectorAll(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+          )
+          const firstElement = focusableElements[0] as HTMLElement
+          const lastElement = focusableElements[focusableElements.length - 1] as HTMLElement
+          
+          if (event.shiftKey && document.activeElement === firstElement) {
+            event.preventDefault()
+            lastElement.focus()
+          } else if (!event.shiftKey && document.activeElement === lastElement) {
+            event.preventDefault()
+            firstElement.focus()
+          }
+          break
+        case 'Enter':
+          // Handle form submission with Enter key
+          if (event.target === document.activeElement) {
+            const target = event.target as HTMLElement
+            if (target.tagName === 'BUTTON' && !target.hasAttribute('disabled')) {
+              event.preventDefault()
+              target.click()
+            }
+          }
+          break
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    
+    // Focus management: focus first focusable element when modal opens
+    if (isOpen) {
+      const firstFocusable = document.querySelector(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      ) as HTMLElement
+      if (firstFocusable) {
+        setTimeout(() => firstFocusable.focus(), 100)
+      }
+    }
+    
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [isOpen, hasMultipleRequests, showKeyboardFeedback]) // Added hasMultipleRequests dependency
+
   return (
     <div 
       className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50"
@@ -462,12 +485,27 @@ export const TransactionVerificationModal = memo(function TransactionVerificatio
       aria-modal="true"
       aria-labelledby="verification-modal-title"
       aria-describedby="verification-modal-description"
+      onClick={(e) => {
+        // Only close if clicking on the backdrop, not on the modal content
+        if (e.target === e.currentTarget) {
+          onCloseRef.current()
+        }
+      }}
     >
       <div className="relative top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border shadow-lg duration-200 sm:max-w-[1000px] p-0 overflow-hidden bg-white">
         <div className="grid max-h-[85vh] grid-rows-[auto_minmax(0,1fr)_auto] bg-white">
           {/* Header */}
           <div className="px-6 pt-6">
-                        <div className="flex flex-col gap-2 text-center sm:text-left space-y-1">
+            {/* Keyboard Shortcut Feedback */}
+            {keyboardFeedback && (
+              <div className="mb-4 bg-blue-50 border border-blue-200 rounded-md p-3 text-center" role="alert" aria-live="polite">
+                <div className="flex items-center justify-center gap-2">
+                  <span className="text-sm font-medium text-blue-700">{keyboardFeedback}</span>
+                </div>
+              </div>
+            )}
+            
+            <div className="flex flex-col gap-2 text-center sm:text-left space-y-1">
               <h2 id="verification-modal-title" className="text-lg leading-none font-semibold">Verify receipt</h2>
               <p id="verification-modal-description" className="text-muted-foreground text-sm">Compare the attached bill with the claim before deciding.</p>
               
@@ -544,8 +582,8 @@ export const TransactionVerificationModal = memo(function TransactionVerificatio
                     {/* TODO: Update this when multiple images are supported in Phase 3 */}
                   </div>
                   <div className="flex items-center gap-2">
-                    {/* TODO: Add image navigation buttons when multiple images are supported */}
-                    {/* <button
+                    {/* Image navigation buttons - currently disabled since only one image */}
+                    <button
                       onClick={() => handleImageNavigation('prev')}
                       disabled={currentImageIndex === 0}
                       className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 size-9"
@@ -557,14 +595,14 @@ export const TransactionVerificationModal = memo(function TransactionVerificatio
                     </button>
                     <button
                       onClick={() => handleImageNavigation('next')}
-                      disabled={currentImageIndex === 0}
+                      disabled={currentImageIndex >= 0} // Only one image currently
                       className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 size-9"
                       type="button"
                       aria-label="Next image"
                       title="Next image (→)"
                     >
-                      <ChevronLeftIcon className="w-4 h-4" />
-                    </button> */}
+                      <ChevronRightIcon className="w-4 h-4" />
+                    </button>
                     <button
                       onClick={() => handleZoom('in')}
                       className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 size-9"
@@ -627,54 +665,66 @@ export const TransactionVerificationModal = memo(function TransactionVerificatio
                           </div>
                         </div>
                       )}
-                      <img 
-                        alt={`Receipt image ${currentImageIndex + 1} for request ${currentRequest.id}`}
-                        className={`max-h-full max-w-full object-contain transition-transform ${isImageLoading ? 'opacity-0' : 'opacity-100'}`}
-                        src={getProxiedReceiptUrl(currentRequest.receiptUrl)}
-                        loading="lazy"
-                        style={{ 
-                          transform: `scale(${imageScale}) rotate(${imageRotation}deg)` 
-                        }}
-                        onLoad={() => {
-                          setIsImageLoading(false)
-                          setImageLoadError(false)
-                        }}
-                        onError={(e) => {
-                          setIsImageLoading(false)
-                          setImageLoadError(true)
-                          // Handle broken image links or CORS errors
-                          const target = e.target as HTMLImageElement
-                          target.style.display = 'none'
-                          const parent = target.parentElement
-                          if (parent) {
-                            parent.innerHTML = `
-                              <div class="text-center text-gray-500">
-                                <div class="w-16 h-16 mx-auto mb-2 bg-gray-200 rounded-full flex items-center justify-center">
-                                  <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                                  </svg>
-                                </div>
-                                <p class="text-sm mb-2">Image failed to load</p>
-                                <p class="text-xs text-gray-400 mb-3">This may be due to CORS restrictions</p>
-                                <div class="space-y-2">
-                                  <button 
-                                    class="block w-full text-xs text-blue-600 hover:text-blue-800 underline"
-                                    onclick="window.open('${currentRequest.receiptUrl}', '_blank')"
-                                  >
-                                    Open in new tab
-                                  </button>
-                                  <button 
-                                    class="block w-full text-xs text-gray-600 hover:text-gray-800 underline"
-                                    onclick="window.location.reload()"
-                                  >
-                                    Retry
-                                  </button>
-                                </div>
-                              </div>
-                            `
-                          }
-                        }}
-                      />
+                      
+                      {imageLoadError ? (
+                        <div className="text-center text-gray-500">
+                          <div className="w-16 h-16 mx-auto mb-2 bg-gray-200 rounded-full flex items-center justify-center">
+                            <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                            </svg>
+                          </div>
+                          <p className="text-sm mb-2">Image failed to load</p>
+                          <p className="text-xs text-gray-400 mb-3">This may be due to CORS restrictions</p>
+                          <div className="space-y-2">
+                                                                                      <button 
+                               className="block w-full text-xs text-blue-600 hover:text-blue-800 underline"
+                               onClick={() => {
+                                 if (currentRequest.receiptUrl) {
+                                   window.open(currentRequest.receiptUrl, '_blank')
+                                 }
+                               }}
+                               disabled={!currentRequest.receiptUrl}
+                             >
+                               Open in new tab
+                             </button>
+                             <button 
+                               className="block w-full text-xs text-gray-600 hover:text-gray-800 underline"
+                               onClick={() => {
+                                 setImageLoadError(false)
+                                 setIsImageLoading(true)
+                                 // Force image reload by adding timestamp
+                                 if (currentRequest.receiptUrl) {
+                                   const img = document.querySelector(`img[alt*="${currentRequest.id}"]`) as HTMLImageElement
+                                   if (img) {
+                                     img.src = `${getProxiedReceiptUrl(currentRequest.receiptUrl)}?t=${Date.now()}`
+                                   }
+                                 }
+                               }}
+                               disabled={!currentRequest.receiptUrl}
+                             >
+                               Retry
+                             </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <img 
+                          alt={`Receipt image ${currentImageIndex + 1} for request ${currentRequest.id}`}
+                          className={`max-h-full max-w-full object-contain transition-transform ${isImageLoading ? 'opacity-0' : 'opacity-100'}`}
+                          src={getProxiedReceiptUrl(currentRequest.receiptUrl)}
+                          loading="lazy"
+                          style={{ 
+                            transform: `scale(${imageScale}) rotate(${imageRotation}deg)` 
+                          }}
+                          onLoad={() => {
+                            setIsImageLoading(false)
+                            setImageLoadError(false)
+                          }}
+                          onError={() => {
+                            setIsImageLoading(false)
+                            setImageLoadError(true)
+                          }}
+                        />
+                      )}
                     </>
                   ) : (
                     <div className="text-center text-gray-500">
@@ -687,7 +737,7 @@ export const TransactionVerificationModal = memo(function TransactionVerificatio
                 </div>
                 
                 <p className="mt-3 text-xs text-muted-foreground">
-                  Tips: Use Alt + ← → to switch requests, ← → to switch images, + / - to zoom, R to rotate, 0 to reset.
+                  Tips: Use Alt + ← → to switch requests, + / - to zoom, R to rotate, 0 to reset.
                 </p>
               </div>
 

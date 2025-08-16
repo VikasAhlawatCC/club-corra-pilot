@@ -29,16 +29,75 @@ export class CoinTransaction {
   })
   type: 'EARN' | 'REDEEM' | 'WELCOME_BONUS' | 'ADJUSTMENT';
 
-  @Column({ type: 'decimal', precision: 10, scale: 2 })
+  @Column({ 
+    type: 'decimal', 
+    precision: 10, 
+    scale: 2,
+    transformer: {
+      to: (value: number) => value,
+      from: (value: string | number) => {
+        if (typeof value === 'string') {
+          const parsed = parseFloat(value);
+          return isNaN(parsed) ? 0 : parsed;
+        }
+        return value || 0;
+      }
+    }
+  })
   amount: number;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  @Column({ 
+    type: 'decimal', 
+    precision: 10, 
+    scale: 2, 
+    nullable: true,
+    transformer: {
+      to: (value: number) => value,
+      from: (value: string | number) => {
+        if (typeof value === 'string') {
+          const parsed = parseFloat(value);
+          return isNaN(parsed) ? 0 : parsed;
+        }
+        return value || 0;
+      }
+    }
+  })
   billAmount: number;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  @Column({ 
+    type: 'decimal', 
+    precision: 10, 
+    scale: 2, 
+    nullable: true,
+    transformer: {
+      to: (value: number) => value,
+      from: (value: string | number) => {
+        if (typeof value === 'string') {
+          const parsed = parseFloat(value);
+          return isNaN(parsed) ? 0 : parsed;
+        }
+        return value || 0;
+      }
+    }
+  })
   coinsEarned: number;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  @Column({ 
+    type: 'decimal', 
+    precision: 10, 
+    scale: 2, 
+    nullable: true,
+    transformer: {
+      to: (value: number) => value,
+      from: (value: string | number) => {
+        if (typeof value === 'string') {
+          const parsed = parseFloat(value);
+          return isNaN(parsed) ? 0 : parsed;
+        }
+        return value || 0;
+      }
+    }
+  })
   coinsRedeemed: number;
 
   @Column({ 

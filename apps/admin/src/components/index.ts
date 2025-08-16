@@ -11,5 +11,9 @@ export { TransactionDetailModal } from './transactions/TransactionDetailModal'
 export { PaymentProcessingModal } from './transactions/PaymentProcessingModal'
 export { TransactionActionButtons } from './transactions/TransactionActionButtons'
 
+// Coin Components
+export { CoinOverview } from './coins/CoinOverview'
+export { TransactionManagement } from './coins/TransactionManagement'
+
 // Common Components
 export * from './common'

@@ -25,6 +25,10 @@ export default function TransactionsPage() {
   // WebSocket integration for real-time updates
   const { isConnected, pendingRequestCounts, recentActivity, connectionError } = useAdminWebSocket()
 
+  // Refs to track modal state more reliably
+  const modalOpenRef = useRef(false)
+  const selectedTransactionRef = useRef<CoinTransaction | null>(null)
+
   // Transaction action handlers
   const handleApproveEarn = async (transactionId: string, adminNotes?: string) => {
     try {
@@ -162,28 +166,45 @@ export default function TransactionsPage() {
     
     // Set the transaction first
     setSelectedTransaction(transaction)
+    selectedTransactionRef.current = transaction
     
     // Open the appropriate modal immediately
     if (transaction.status === 'PENDING') {
       setShowVerificationModal(true)
+      setShowDetailModal(false) // Ensure detail modal is closed
+      modalOpenRef.current = true
     } else {
       setShowDetailModal(true)
+      setShowVerificationModal(false) // Ensure verification modal is closed
+      modalOpenRef.current = true
     }
     
     // Re-enable selection after modal is fully open
     setTimeout(() => {
       setIsSelectingTransaction(false)
-    }, 300)
+    }, 500) // Increased from 300ms to 500ms for better stability
   }, [isSelectingTransaction])
 
   const handleDetailModalClose = useCallback(() => {
     setShowDetailModal(false)
-    setSelectedTransaction(null)
+    modalOpenRef.current = false
+    // Don't immediately clear selectedTransaction to prevent flickering
+    // Clear it after a short delay to ensure smooth transition
+    setTimeout(() => {
+      setSelectedTransaction(null)
+      selectedTransactionRef.current = null
+    }, 100)
   }, [])
 
   const handleVerificationModalClose = useCallback(() => {
     setShowVerificationModal(false)
-    setSelectedTransaction(null)
+    modalOpenRef.current = false
+    // Don't immediately clear selectedTransaction to prevent flickering
+    // Clear it after a short delay to ensure smooth transition
+    setTimeout(() => {
+      setSelectedTransaction(null)
+      selectedTransactionRef.current = null
+    }, 100)
   }, [])
 
   const handlePaymentModalClose = useCallback(() => {
@@ -230,28 +251,53 @@ export default function TransactionsPage() {
   // Clean up state when transactions change or component unmounts
   useEffect(() => {
     return () => {
-      // Only cleanup if not selecting
-      if (!isSelectingTransaction) {
+      // Only cleanup if not selecting and no modals are open
+      if (!isSelectingTransaction && !modalOpenRef.current) {
         setSelectedTransaction(null)
         setShowDetailModal(false)
         setShowVerificationModal(false)
+        selectedTransactionRef.current = null
+        modalOpenRef.current = false
       }
     }
   }, [isSelectingTransaction])
 
-  // Reset selection state when transactions change
+  // Reset selection state when transactions change - but only if no modal is open
   useEffect(() => {
-    
     // Only reset if we have a selected transaction and it's no longer in the list
     if (selectedTransaction && !transactions.find(t => t.id === selectedTransaction?.id)) {
       // Don't reset if we're currently showing a modal
-      if (!showDetailModal && !showVerificationModal) {
+      if (!modalOpenRef.current) {
         setSelectedTransaction(null)
+        selectedTransactionRef.current = null
       }
     }
-  }, [transactions, selectedTransaction, showDetailModal, showVerificationModal])
+  }, [transactions, selectedTransaction])
 
-  // Remove the debounced state section since we're using simple state now
+  // Prevent modal from closing when transactions are refreshed
+  useEffect(() => {
+    // If we have a selected transaction and a modal is open, preserve the state
+    if (selectedTransaction && modalOpenRef.current) {
+      // Check if the selected transaction still exists in the current transactions
+      const transactionExists = transactions.find(t => t.id === selectedTransaction.id)
+      if (!transactionExists) {
+        // Only close if the transaction was actually removed/deleted
+        setShowDetailModal(false)
+        setShowVerificationModal(false)
+        setSelectedTransaction(null)
+        selectedTransactionRef.current = null
+        modalOpenRef.current = false
+      }
+    }
+  }, [transactions, selectedTransaction])
+
+  // Synchronize refs with state when component re-renders
+  useEffect(() => {
+    modalOpenRef.current = showDetailModal || showVerificationModal
+    if (!selectedTransaction) {
+      selectedTransactionRef.current = null
+    }
+  }, [showDetailModal, showVerificationModal, selectedTransaction])
 
   return (
     <div className="space-y-6">

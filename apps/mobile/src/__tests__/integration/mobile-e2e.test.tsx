@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react-
 import { useAuthStore } from '@/stores/auth.store';
 import { authService } from '@/services/auth.service';
 import { otpService } from '@/services/otp.service';
-import { AuthProvider } from '@/providers/AuthProvider';
+// AuthProvider removed - using Zustand store directly
 import { ThemeProvider } from '@/providers/ThemeProvider';
 import { RealTimeProvider } from '@/providers/RealTimeProvider';
 
@@ -72,9 +72,7 @@ jest.mock('expo-auth-session', () => ({
 const TestWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <ThemeProvider>
     <RealTimeProvider>
-      <AuthProvider>
-        {children}
-      </AuthProvider>
+      {children}
     </RealTimeProvider>
   </ThemeProvider>
 );

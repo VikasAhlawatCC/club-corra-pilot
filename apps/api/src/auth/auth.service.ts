@@ -329,7 +329,7 @@ export class AuthService {
     // Find user by email
     const user = await this.usersService.findByEmail(email);
     if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException('Email address not registered. Please sign up first or check your email address.');
     }
 
     // Check if user has password set
@@ -340,7 +340,7 @@ export class AuthService {
     // Validate password
     const isValidPassword = await this.usersService.validatePassword(user.id, password);
     if (!isValidPassword) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException('Incorrect password. Please check your password and try again.');
     }
 
     if (user.status !== UserStatus.ACTIVE) {
@@ -367,7 +367,7 @@ export class AuthService {
     // Find user by mobile number
     const user = await this.usersService.findByMobileNumber(mobileNumber);
     if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException('Mobile number not registered. Please sign up first or check your mobile number.');
     }
 
     // Check if user has password set
@@ -378,7 +378,7 @@ export class AuthService {
     // Validate password
     const isValidPassword = await this.usersService.validatePassword(user.id, password);
     if (!isValidPassword) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException('Incorrect password. Please check your password and try again.');
     }
 
     if (user.status !== UserStatus.ACTIVE) {
@@ -797,6 +797,15 @@ export class AuthService {
           message: 'Mobile number verified successfully. Please set up your password.',
           userId: user.id,
           requiresPasswordSetup: true,
+          user: {
+            id: user.id,
+            mobileNumber: user.mobileNumber,
+            status: user.status,
+            profile: user.profile ? {
+              firstName: user.profile.firstName,
+              lastName: user.profile.lastName,
+            } : undefined,
+          },
         };
       }
 
@@ -858,6 +867,15 @@ export class AuthService {
           accessToken: tokens.accessToken,
           refreshToken: tokens.refreshToken,
           expiresIn: tokens.expiresIn,
+          user: {
+            id: user.id,
+            mobileNumber: user.mobileNumber,
+            status: user.status,
+            profile: user.profile ? {
+              firstName: user.profile.firstName,
+              lastName: user.profile.lastName,
+            } : undefined,
+          },
         };
       } else {
         // Mobile not verified, this shouldn't happen in normal flow

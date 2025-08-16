@@ -35,7 +35,7 @@ export default function CategoriesPage() {
       // Map categories with brand counts
       const categoriesWithCounts = categoriesResponse.map(category => ({
         ...category,
-        brandCount: brandsResponse.data.filter(brand => brand.categoryId === category.id).length
+        brandCount: brandsResponse.brands.filter(brand => brand.categoryId === category.id).length
       }))
       
       setCategories(categoriesWithCounts)

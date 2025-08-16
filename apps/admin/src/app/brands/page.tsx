@@ -28,6 +28,9 @@ function BrandsPageContent() {
     deleteBrand,
     toggleBrandStatus,
   } = useBrands()
+
+  // Ensure brands is always an array to prevent crashes
+  const safeBrands = brands || []
   
   const {
     searchTerm,
@@ -60,14 +63,6 @@ function BrandsPageContent() {
   useEffect(() => {
     // Only fetch brands when dependencies actually change, not on every render
     if (currentPage > 0) {
-      console.log('Fetching brands with params:', {
-        page: currentPage,
-        pageSize,
-        searchTerm: debouncedSearchTerm,
-        categoryFilter,
-        statusFilter
-      })
-      
       fetchBrands({
         page: currentPage,
         pageSize,
@@ -288,7 +283,7 @@ function BrandsPageContent() {
             </div>
             
             <div className="text-sm text-gray-500">
-              Showing {brands.length} of {totalBrands} brands
+              Showing {safeBrands.length} of {totalBrands} brands
               {hasActiveFilters && (
                 <span className="ml-2 text-indigo-600">
                   (filtered)
@@ -315,7 +310,7 @@ function BrandsPageContent() {
                 <div key={i} className="h-16 bg-gray-200 rounded"></div>
               ))}
             </div>
-          ) : brands.length === 0 ? (
+          ) : safeBrands.length === 0 ? (
             <div className="text-center py-12">
               <div className="text-gray-400 mb-4">
                 <svg className="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -341,7 +336,7 @@ function BrandsPageContent() {
           ) : (
             <>
               <BrandTable 
-                brands={brands}
+                brands={safeBrands}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
                 onView={handleView}
@@ -417,7 +412,7 @@ function BrandsPageContent() {
 
 export default function BrandsPage() {
   return (
-    <ErrorBoundary>
+    <ErrorBoundary fallback={<div className="p-6 text-red-600">Something went wrong loading the brands page. Please refresh the page.</div>}>
       <BrandsPageContent />
     </ErrorBoundary>
   )

@@ -9,23 +9,16 @@ import {
   CheckCircleIcon
 } from '@heroicons/react/24/outline'
 
-interface CoinSystemStats {
-  totalCoinsInCirculation: number
-  totalUsers: number
-  welcomeBonusesGiven: number
-  pendingRedemptions: number
-  activeBrands: number
-  systemHealth: 'healthy' | 'warning' | 'critical'
-}
+import { CoinSystemStats, AdminCoinTransaction } from '@/types/coins'
 
 interface RecentTransaction {
   id: string
   userId: string
   userName: string
-  type: 'WELCOME_BONUS' | 'EARNED' | 'REDEEMED' | 'EXPIRED' | 'ADJUSTMENT'
+  type: 'WELCOME_BONUS' | 'EARN' | 'REDEEM' | 'ADJUSTMENT'
   amount: number
   timestamp: Date
-  status: 'completed' | 'pending' | 'failed'
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'PROCESSED' | 'PAID'
 }
 
 interface CoinOverviewProps {
@@ -73,12 +66,10 @@ export function CoinOverview({
     switch (type) {
       case 'WELCOME_BONUS':
         return 'text-green-600 bg-green-100'
-      case 'EARNED':
+      case 'EARN':
         return 'text-blue-600 bg-blue-100'
-      case 'REDEEMED':
+      case 'REDEEM':
         return 'text-orange-600 bg-orange-100'
-      case 'EXPIRED':
-        return 'text-red-600 bg-red-100'
       case 'ADJUSTMENT':
         return 'text-purple-600 bg-purple-100'
       default:
@@ -88,11 +79,13 @@ export function CoinOverview({
 
   const getTransactionStatusColor = (status: RecentTransaction['status']) => {
     switch (status) {
-      case 'completed':
+      case 'APPROVED':
+      case 'PROCESSED':
+      case 'PAID':
         return 'text-green-600 bg-green-100'
-      case 'pending':
+      case 'PENDING':
         return 'text-yellow-600 bg-yellow-100'
-      case 'failed':
+      case 'REJECTED':
         return 'text-red-600 bg-red-100'
       default:
         return 'text-gray-600 bg-gray-100'
@@ -230,9 +223,9 @@ export function CoinOverview({
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getTransactionTypeColor(transaction.type)}`}>
-                      {transaction.type.replace('_', ' ')}
-                    </span>
+                                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getTransactionTypeColor(transaction.type)}`}>
+                    {transaction.type === 'WELCOME_BONUS' ? 'WELCOME BONUS' : transaction.type}
+                  </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     <span className={transaction.amount >= 0 ? 'text-green-600' : 'text-red-600'}>

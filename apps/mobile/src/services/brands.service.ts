@@ -4,6 +4,7 @@ import {
   brandSchema,
   brandCategorySchema
 } from '@shared/schemas';
+import { environment } from '../config/environment';
 import type { z } from 'zod';
 
 type BrandListResponse = z.infer<typeof brandListResponseSchema>;
@@ -11,7 +12,12 @@ type BrandSearch = z.infer<typeof brandSearchSchema>;
 type Brand = z.infer<typeof brandSchema>;
 type BrandCategory = z.infer<typeof brandCategorySchema>;
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.4:3001';
+// Use environment configuration
+const API_BASE_URL = environment.apiBaseUrl;
+
+// Debug logging
+console.log('🔧 API_BASE_URL from environment:', API_BASE_URL);
+console.log('🔧 Environment config:', environment);
 
 class BrandsService {
   private lastSearchTime = 0;
@@ -21,7 +27,8 @@ class BrandsService {
     endpoint: string, 
     options: RequestInit = {}
   ): Promise<T> {
-    const url = `${API_BASE_URL}/brands/${endpoint}`;
+    const url = `${API_BASE_URL}/brands${endpoint}`;
+    console.log('🔗 Full URL being called:', url);
     
     const response = await fetch(url, {
       headers: {
@@ -61,7 +68,9 @@ class BrandsService {
     if (searchParams.limit) queryString.append('limit', searchParams.limit.toString());
 
     const endpoint = queryString.toString() ? `?${queryString.toString()}` : '';
+    console.log('🌐 Making request to:', `${API_BASE_URL}/brands${endpoint}`);
     const response = await this.makeRequest(endpoint);
+    console.log('📡 Raw API response:', response);
     
     return brandListResponseSchema.parse(response);
   }

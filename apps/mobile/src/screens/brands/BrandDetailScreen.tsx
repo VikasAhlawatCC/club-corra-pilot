@@ -8,6 +8,7 @@ import {
   Image,
   ActivityIndicator,
   Alert,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -16,15 +17,20 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { useBrandsStore } from '../../stores/brands.store';
 import { useCoinsStore } from '../../stores/coins.store';
-import { colors, spacing, borderRadius, typography, shadows } from '../../styles/theme';
+import { colors, spacing, borderRadius, typography, shadows, glassEffects } from '../../styles/theme';
+
+const { width: screenWidth } = Dimensions.get('window');
 
 export default function BrandDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const [selectedAction, setSelectedAction] = useState<'earn' | 'redeem' | null>(null);
+  const [isNavigating, setIsNavigating] = useState(false);
   
   const { brands, fetchBrands, isLoading: brandsLoading } = useBrandsStore();
-  const { balance } = useCoinsStore();
+  const { balance: balanceData } = useCoinsStore();
+  
+  // Extract balance value from the response object
+  const balance = balanceData?.balance || 0;
 
   const brand = brands.find(b => b.id === id);
 
@@ -34,20 +40,27 @@ export default function BrandDetailScreen() {
     }
   }, [brands.length, fetchBrands]);
 
-  const handleActionSelect = (action: 'earn' | 'redeem') => {
-    setSelectedAction(action);
+  const handleActionSelect = async (action: 'earn' | 'redeem') => {
+    if (isNavigating) return;
     
-    // Navigate to the appropriate transaction screen
-    if (action === 'earn') {
-      router.push({
-        pathname: '/transactions/earn',
-        params: { brandId: id }
-      });
-    } else {
-      router.push({
-        pathname: '/transactions/redeem',
-        params: { brandId: id }
-      });
+    setIsNavigating(true);
+    
+    try {
+      // Navigate to the appropriate transaction screen
+      if (action === 'earn') {
+        router.push({
+          pathname: '/transactions/earn',
+          params: { brandId: id }
+        });
+      } else {
+        router.push({
+          pathname: '/transactions/redeem',
+          params: { brandId: id }
+        });
+      }
+    } catch (error) {
+      console.error('Navigation error:', error);
+      setIsNavigating(false);
     }
   };
 
@@ -58,8 +71,15 @@ export default function BrandDetailScreen() {
   if (brandsLoading) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.gold[500]} />
-        <Text style={styles.loadingText}>Loading brand details...</Text>
+        <LinearGradient
+          colors={[colors.background.dark[900], colors.background.dark[800]]}
+          style={styles.gradient}
+        >
+          <View style={styles.loadingContent}>
+            <ActivityIndicator size="large" color={colors.gold[500]} />
+            <Text style={styles.loadingText}>Loading brand details...</Text>
+          </View>
+        </LinearGradient>
       </SafeAreaView>
     );
   }
@@ -67,12 +87,21 @@ export default function BrandDetailScreen() {
   if (!brand) {
     return (
       <SafeAreaView style={styles.errorContainer}>
-        <Ionicons name="alert-circle" size={64} color={colors.error[500]} />
-        <Text style={styles.errorTitle}>Brand Not Found</Text>
-        <Text style={styles.errorMessage}>The brand you're looking for doesn't exist.</Text>
-        <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-          <Text style={styles.backButtonText}>Go Back</Text>
-        </TouchableOpacity>
+        <LinearGradient
+          colors={[colors.background.dark[900], colors.background.dark[800]]}
+          style={styles.gradient}
+        >
+          <View style={styles.errorContent}>
+            <View style={styles.errorIconContainer}>
+              <Ionicons name="alert-circle" size={64} color={colors.error[500]} />
+            </View>
+            <Text style={styles.errorTitle}>Brand Not Found</Text>
+            <Text style={styles.errorMessage}>The brand you're looking for doesn't exist.</Text>
+            <TouchableOpacity style={styles.errorBackButton} onPress={handleBack}>
+              <Text style={styles.errorBackButtonText}>Go Back</Text>
+            </TouchableOpacity>
+          </View>
+        </LinearGradient>
       </SafeAreaView>
     );
   }
@@ -83,13 +112,15 @@ export default function BrandDetailScreen() {
     Math.floor((balance * brand.redemptionPercentage) / 100)
   );
 
+  const canRedeem = balance >= brand.minRedemptionAmount;
+
   return (
     <SafeAreaView style={styles.container}>
       <LinearGradient
         colors={[colors.background.dark[900], colors.background.dark[800]]}
         style={styles.gradient}
       >
-        {/* Header */}
+        {/* Enhanced Header */}
         <View style={styles.header}>
           <TouchableOpacity style={styles.backButton} onPress={handleBack}>
             <Ionicons name="arrow-back" size={24} color={colors.white} />
@@ -98,8 +129,12 @@ export default function BrandDetailScreen() {
           <View style={styles.placeholder} />
         </View>
 
-        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-          {/* Brand Card */}
+        <ScrollView 
+          style={styles.scrollView} 
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+        >
+          {/* Enhanced Brand Card */}
           <View style={styles.brandCard}>
             <View style={styles.brandHeader}>
               {brand.logoUrl ? (
@@ -123,103 +158,128 @@ export default function BrandDetailScreen() {
             </View>
           </View>
 
-          {/* Brand Stats */}
+          {/* Prominent Balance Display */}
+          <View style={styles.balanceSection}>
+            <View style={styles.balanceCard}>
+              <View style={styles.balanceHeader}>
+                <Ionicons name="wallet" size={24} color={colors.gold[500]} />
+                <Text style={styles.balanceTitle}>Your Balance</Text>
+              </View>
+              <Text style={styles.balanceAmount}>{balance}</Text>
+              <Text style={styles.balanceCurrency}>Corra Coins</Text>
+              
+              {!canRedeem && (
+                <View style={styles.balanceWarning}>
+                  <Ionicons name="information-circle" size={16} color={colors.warning[500]} />
+                  <Text style={styles.balanceWarningText}>
+                    Need {brand.minRedemptionAmount - balance} more coins to redeem
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+
+          {/* Enhanced Brand Stats */}
           <View style={styles.statsContainer}>
             <View style={styles.statCard}>
-              <Ionicons name="trending-up" size={24} color={colors.success[500]} />
+              <View style={styles.statIconContainer}>
+                <Ionicons name="trending-up" size={24} color={colors.success[500]} />
+              </View>
               <Text style={styles.statValue}>{brand.earningPercentage}%</Text>
               <Text style={styles.statLabel}>Earning Rate</Text>
               <Text style={styles.statDescription}>
-                Earn {brand.earningPercentage}% of your bill amount in Corra Coins
+                Earn {brand.earningPercentage}% of your bill amount
               </Text>
             </View>
 
             <View style={styles.statCard}>
-              <Ionicons name="gift" size={24} color={colors.gold[500]} />
+              <View style={styles.statIconContainer}>
+                <Ionicons name="gift" size={24} color={colors.gold[500]} />
+              </View>
               <Text style={styles.statValue}>{brand.redemptionPercentage}%</Text>
               <Text style={styles.statLabel}>Redemption Rate</Text>
               <Text style={styles.statDescription}>
-                Redeem coins for {brand.redemptionPercentage}% cashback on your bill
+                Get {brand.redemptionPercentage}% cashback on bills
               </Text>
             </View>
           </View>
 
-          {/* Action Selection */}
+          {/* Enhanced Action Section */}
           <View style={styles.actionSection}>
-            <Text style={styles.sectionTitle}>What would you like to do?</Text>
+            <Text style={styles.sectionTitle}>Choose Your Action</Text>
             
             <View style={styles.actionCards}>
+              {/* Earn Action Card */}
               <TouchableOpacity
-                style={[styles.actionCard, selectedAction === 'earn' && styles.actionCardSelected]}
+                style={[styles.actionCard, styles.actionCardEarn]}
                 onPress={() => handleActionSelect('earn')}
                 activeOpacity={0.8}
+                disabled={isNavigating}
               >
-                <View style={styles.actionIcon}>
-                  <Ionicons 
-                    name="add-circle" 
-                    size={32} 
-                    color={selectedAction === 'earn' ? colors.white : colors.success[500]} 
-                  />
+                <View style={styles.actionCardHeader}>
+                  <View style={styles.actionIconContainer}>
+                    <Ionicons name="add-circle" size={32} color={colors.success[500]} />
+                  </View>
+                  <View style={styles.actionBadge}>
+                    <Text style={styles.actionBadgeText}>Recommended</Text>
+                  </View>
                 </View>
-                <Text style={[styles.actionTitle, selectedAction === 'earn' && styles.actionTitleSelected]}>
-                  Earn Coins
-                </Text>
-                <Text style={[styles.actionDescription, selectedAction === 'earn' && styles.actionDescriptionSelected]}>
+                
+                <Text style={styles.actionTitle}>Earn Coins</Text>
+                <Text style={styles.actionDescription}>
                   Upload your receipt to earn {brand.earningPercentage}% of your bill amount
                 </Text>
-                <View style={styles.actionBadge}>
-                  <Text style={styles.actionBadgeText}>Recommended</Text>
+                
+                <View style={styles.actionFooter}>
+                  <Text style={styles.actionFooterText}>Tap to continue</Text>
+                  <Ionicons name="arrow-forward" size={16} color={colors.success[500]} />
                 </View>
               </TouchableOpacity>
 
+              {/* Redeem Action Card */}
               <TouchableOpacity
                 style={[
                   styles.actionCard, 
-                  selectedAction === 'redeem' && styles.actionCardSelected,
-                  balance < brand.minRedemptionAmount && styles.actionCardDisabled
+                  styles.actionCardRedeem,
+                  !canRedeem && styles.actionCardDisabled
                 ]}
                 onPress={() => handleActionSelect('redeem')}
                 activeOpacity={0.8}
-                disabled={balance < brand.minRedemptionAmount}
+                disabled={!canRedeem || isNavigating}
               >
-                <View style={styles.actionIcon}>
-                  <Ionicons 
-                    name="gift" 
-                    size={32} 
-                    color={
-                      selectedAction === 'redeem' 
-                        ? colors.white 
-                        : balance < brand.minRedemptionAmount 
-                          ? colors.gray[400] 
-                          : colors.gold[500]
-                    } 
-                  />
+                <View style={styles.actionCardHeader}>
+                  <View style={styles.actionIconContainer}>
+                    <Ionicons 
+                      name="gift" 
+                      size={32} 
+                      color={canRedeem ? colors.gold[500] : colors.gray[400]} 
+                    />
+                  </View>
+                  {canRedeem ? (
+                    <View style={styles.actionBadge}>
+                      <Text style={styles.actionBadgeText}>Available</Text>
+                    </View>
+                  ) : (
+                    <View style={styles.actionBadgeDisabled}>
+                      <Text style={styles.actionBadgeTextDisabled}>Locked</Text>
+                    </View>
+                  )}
                 </View>
-                <Text style={[
-                  styles.actionTitle, 
-                  selectedAction === 'redeem' && styles.actionTitleSelected,
-                  balance < brand.minRedemptionAmount && styles.actionTitleDisabled
-                ]}>
-                  Redeem Coins
-                </Text>
-                <Text style={[
-                  styles.actionDescription, 
-                  selectedAction === 'redeem' && styles.actionDescriptionSelected,
-                  balance < brand.minRedemptionAmount && styles.actionDescriptionDisabled
-                ]}>
+                
+                <Text style={styles.actionTitle}>Redeem Coins</Text>
+                <Text style={styles.actionDescription}>
                   Use your coins for cashback on your bill
                 </Text>
                 
-                {balance < brand.minRedemptionAmount ? (
-                  <View style={styles.actionBadgeDisabled}>
-                    <Text style={styles.actionBadgeTextDisabled}>
-                      Need {brand.minRedemptionAmount - balance} more coins
-                    </Text>
+                {canRedeem ? (
+                  <View style={styles.actionFooter}>
+                    <Text style={styles.actionFooterText}>Up to {maxRedeemable} coins</Text>
+                    <Ionicons name="arrow-forward" size={16} color={colors.gold[500]} />
                   </View>
                 ) : (
-                  <View style={styles.actionBadge}>
-                    <Text style={styles.actionBadgeText}>
-                      Up to {maxRedeemable} coins
+                  <View style={styles.actionFooter}>
+                    <Text style={styles.actionFooterTextDisabled}>
+                      Need {brand.minRedemptionAmount - balance} more coins
                     </Text>
                   </View>
                 )}
@@ -227,25 +287,9 @@ export default function BrandDetailScreen() {
             </View>
           </View>
 
-          {/* Balance Info */}
-          <View style={styles.balanceSection}>
-            <View style={styles.balanceCard}>
-              <Text style={styles.balanceTitle}>Your Current Balance</Text>
-              <Text style={styles.balanceAmount}>{balance}</Text>
-              <Text style={styles.balanceCurrency}>Corra Coins</Text>
-              
-              {balance < brand.minRedemptionAmount && (
-                <View style={styles.balanceWarning}>
-                  <Ionicons name="information-circle" size={16} color={colors.warning[500]} />
-                  <Text style={styles.balanceWarningText}>
-                    You need at least {brand.minRedemptionAmount} coins to redeem from this brand
-                  </Text>
-                </View>
-              )}
-            </View>
-          </View>
 
-          {/* Redemption Limits */}
+
+          {/* Enhanced Redemption Limits */}
           <View style={styles.limitsSection}>
             <Text style={styles.sectionTitle}>Redemption Limits</Text>
             <View style={styles.limitsGrid}>
@@ -268,6 +312,9 @@ export default function BrandDetailScreen() {
               </View>
             </View>
           </View>
+
+          {/* Bottom Spacing */}
+          <View style={styles.bottomSpacing} />
         </ScrollView>
       </LinearGradient>
     </SafeAreaView>
@@ -284,9 +331,12 @@ const styles = StyleSheet.create({
   },
   loadingContainer: {
     flex: 1,
+    backgroundColor: colors.background.dark[900],
+  },
+  loadingContent: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.background.dark[900],
   },
   loadingText: {
     ...typography.bodyMedium,
@@ -295,10 +345,16 @@ const styles = StyleSheet.create({
   },
   errorContainer: {
     flex: 1,
+    backgroundColor: colors.background.dark[900],
+  },
+  errorContent: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.background.dark[900],
     padding: spacing[6],
+  },
+  errorIconContainer: {
+    marginBottom: spacing[4],
   },
   errorTitle: {
     ...typography.headingMedium,
@@ -311,6 +367,19 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
     textAlign: 'center',
     marginBottom: spacing[6],
+    paddingHorizontal: spacing[4],
+  },
+  errorBackButton: {
+    backgroundColor: colors.gold[500],
+    paddingHorizontal: spacing[6],
+    paddingVertical: spacing[3],
+    borderRadius: borderRadius.lg,
+    ...shadows.md,
+  },
+  errorBackButtonText: {
+    ...typography.button,
+    color: colors.background.dark[900],
+    fontWeight: '600',
   },
   header: {
     flexDirection: 'row',
@@ -318,26 +387,38 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: spacing[4],
     paddingVertical: spacing[4],
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.primary,
+    backgroundColor: colors.background.dark[900],
   },
   backButton: {
     padding: spacing[2],
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.card.glass,
   },
   headerTitle: {
     ...typography.headingSmall,
     color: colors.white,
+    fontWeight: '600',
   },
   placeholder: {
     width: 40,
   },
   scrollView: {
     flex: 1,
+  },
+  scrollContent: {
     paddingHorizontal: spacing[4],
+    paddingBottom: spacing[6],
   },
   brandCard: {
-    backgroundColor: colors.white,
-    borderRadius: borderRadius.lg,
+    backgroundColor: colors.card.primary,
+    borderRadius: borderRadius.xl,
     padding: spacing[6],
+    marginTop: spacing[6],
     marginBottom: spacing[6],
+    borderWidth: 1,
+    borderColor: colors.border.primary,
     ...shadows.card,
   },
   brandHeader: {
@@ -393,12 +474,23 @@ const styles = StyleSheet.create({
     marginBottom: spacing[6],
     gap: spacing[4],
   },
+  statIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: borderRadius.lg,
+    backgroundColor: colors.card.secondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing[3],
+  },
   statCard: {
     flex: 1,
-    backgroundColor: colors.white,
-    borderRadius: borderRadius.lg,
+    backgroundColor: colors.card.primary,
+    borderRadius: borderRadius.xl,
     padding: spacing[4],
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border.primary,
     ...shadows.card,
   },
   statValue: {
@@ -432,13 +524,21 @@ const styles = StyleSheet.create({
     gap: spacing[4],
   },
   actionCard: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.card.primary,
     borderRadius: borderRadius.lg,
     padding: spacing[6],
     alignItems: 'center',
     borderWidth: 2,
     borderColor: colors.gray[200],
     ...shadows.card,
+  },
+  actionCardEarn: {
+    borderColor: colors.success[500],
+    borderWidth: 2,
+  },
+  actionCardRedeem: {
+    borderColor: colors.gold[500],
+    borderWidth: 2,
   },
   actionCardSelected: {
     backgroundColor: colors.gold[500],
@@ -447,6 +547,20 @@ const styles = StyleSheet.create({
   actionCardDisabled: {
     backgroundColor: colors.gray[100],
     borderColor: colors.gray[200],
+  },
+  actionCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: spacing[4],
+  },
+  actionIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: borderRadius.lg,
+    backgroundColor: colors.card.secondary,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   actionIcon: {
     marginBottom: spacing[3],
@@ -481,6 +595,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing[3],
     paddingVertical: spacing[1],
     borderRadius: borderRadius.full,
+    borderWidth: 1,
+    borderColor: colors.success[100],
   },
   actionBadgeText: {
     ...typography.bodySmall,
@@ -488,25 +604,50 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   actionBadgeDisabled: {
-    backgroundColor: colors.warning[100],
+    backgroundColor: colors.gray[100],
     paddingHorizontal: spacing[3],
     paddingVertical: spacing[1],
     borderRadius: borderRadius.full,
+    borderWidth: 1,
+    borderColor: colors.gray[200],
   },
   actionBadgeTextDisabled: {
     ...typography.bodySmall,
-    color: colors.warning[700],
+    color: colors.gray[500],
     fontWeight: '600',
+  },
+  actionFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: spacing[3],
+    borderTopWidth: 1,
+    borderTopColor: colors.border.primary,
+  },
+  actionFooterText: {
+    ...typography.bodySmall,
+    color: colors.text.secondary,
+    fontWeight: '500',
+  },
+  actionFooterTextDisabled: {
+    ...typography.bodySmall,
+    color: colors.gray[400],
+    fontWeight: '500',
   },
   balanceSection: {
     marginBottom: spacing[6],
   },
   balanceCard: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.card.primary,
     borderRadius: borderRadius.lg,
     padding: spacing[6],
     alignItems: 'center',
     ...shadows.card,
+  },
+  balanceHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing[3],
   },
   balanceTitle: {
     ...typography.bodyMedium,
@@ -530,6 +671,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing[3],
     paddingVertical: spacing[2],
     borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.warning[100],
   },
   balanceWarningText: {
     ...typography.bodySmall,
@@ -542,7 +685,7 @@ const styles = StyleSheet.create({
   },
   limitsGrid: {
     flexDirection: 'row',
-    backgroundColor: colors.white,
+    backgroundColor: colors.card.primary,
     borderRadius: borderRadius.lg,
     padding: spacing[4],
     ...shadows.card,
@@ -567,7 +710,10 @@ const styles = StyleSheet.create({
   },
   limitDivider: {
     width: 1,
-    backgroundColor: colors.gray[200],
+    backgroundColor: colors.border.primary,
     marginHorizontal: spacing[2],
+  },
+  bottomSpacing: {
+    height: spacing[6],
   },
 });

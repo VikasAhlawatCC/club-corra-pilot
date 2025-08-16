@@ -27,6 +27,7 @@
     "test:runner": "turbo run test:runner",
     "test:phase3": "ts-node scripts/run-phase3-tests.ts",
     "test:auth-integration": "yarn test:phase3",
+    "test:login": "node scripts/test-login-flow.js",
     "clean": "turbo run clean && rm -rf node_modules",
     "format": "prettier --write \"**/*.{ts,tsx,md,json}\"",
     "prepare": "husky install"

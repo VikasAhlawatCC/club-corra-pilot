@@ -26,7 +26,6 @@ export default function LoginScreen() {
     }
 
     if (!pwd) {
-      setIsLoading(false);
       Alert.alert('Missing Password', 'Please enter your password');
       return;
     }
@@ -38,27 +37,27 @@ export default function LoginScreen() {
         await loginWithEmail(id, pwd);
         router.replace('/(tabs)/home');
       } else {
-        // Mobile number login - try password first, fallback to OTP if no password
-        try {
-          await loginWithMobilePassword(id, pwd);
-          router.replace('/(tabs)/home');
-        } catch (passwordError) {
-          // If password login fails, check if it's because user doesn't have password
-          if (passwordError instanceof Error && 
-              (passwordError.message.includes('Password not set') || 
-               passwordError.message.includes('Invalid credentials'))) {
-            // Fallback to OTP login
-            await sendLoginOTP(id);
-            router.push('/auth/login-otp');
-          } else {
-            throw passwordError;
-          }
-        }
+        // Mobile number login
+        await loginWithMobilePassword(id, pwd);
+        router.replace('/(tabs)/home');
       }
     } catch (error) {
       setIsLoading(false);
       if (error instanceof Error) {
-        Alert.alert('Login Failed', error.message);
+        // Provide more specific error messages based on the error content
+        if (error.message.includes('Mobile number not registered') || error.message.includes('Email address not registered')) {
+          Alert.alert('Account Not Found', error.message);
+        } else if (error.message.includes('Incorrect password')) {
+          Alert.alert('Incorrect Password', error.message);
+        } else if (error.message.includes('Password not set')) {
+          Alert.alert('Password Not Set', 'This account doesn\'t have a password set. Please use OTP login instead.');
+        } else if (error.message.includes('User account is not active')) {
+          Alert.alert('Account Inactive', error.message);
+        } else if (error.message.includes('Server is not accessible')) {
+          Alert.alert('Server Error', error.message);
+        } else {
+          Alert.alert('Login Failed', error.message);
+        }
       } else {
         Alert.alert('Error', 'Login failed. Please try again.');
       }
@@ -79,14 +78,33 @@ export default function LoginScreen() {
 
     if (id.includes('@')) {
       // For email, show message about password reset
-      Alert.alert('Password Reset', 'Password reset functionality will be implemented in Phase 2B');
+      Alert.alert(
+        'Password Reset', 
+        'Password reset functionality will be implemented in Phase 2B. For now, please use OTP login if you cannot remember your password.',
+        [
+          { text: 'OK', style: 'default' },
+          { 
+            text: 'Use OTP Instead', 
+            onPress: () => Alert.alert('OTP Login', 'OTP login is only available for mobile numbers. Please enter your mobile number to use OTP login.') 
+          }
+        ]
+      );
     } else {
       // For mobile number, send OTP for password reset
       try {
         setIsLoading(true);
         await sendLoginOTP(id);
-        Alert.alert('OTP Sent', 'An OTP has been sent to your mobile number for password reset');
-        router.push('/auth/login-otp');
+        Alert.alert(
+          'OTP Sent', 
+          'An OTP has been sent to your mobile number. You can use this OTP to login or reset your password.',
+          [
+            { text: 'OK', style: 'default' },
+            { 
+              text: 'Login with OTP', 
+              onPress: () => router.push('/auth/login-otp') 
+            }
+          ]
+        );
       } catch (error) {
         if (error instanceof Error) {
           Alert.alert('Error', error.message);
@@ -110,28 +128,45 @@ export default function LoginScreen() {
   const handleOtpLogin = async () => {
     const id = identifier.trim();
     
-    if (!id) {
-      Alert.alert('Missing Information', 'Please enter your mobile number first');
-      return;
-    }
-
     if (id.includes('@')) {
-      Alert.alert('Invalid Input', 'OTP login is only available for mobile numbers');
+      Alert.alert(
+        'OTP Login Unavailable', 
+        'OTP login is only available for mobile numbers. Please enter your mobile number to use OTP login.',
+        [
+          { text: 'OK', style: 'default' },
+          { 
+            text: 'Clear and Enter Mobile', 
+            onPress: () => {
+              setIdentifier('');
+              setPassword('');
+            }
+          }
+        ]
+      );
       return;
     }
 
-    try {
-      setIsLoading(true);
-      await sendLoginOTP(id);
-      router.push('/auth/login-otp');
-    } catch (error) {
-      if (error instanceof Error) {
-        Alert.alert('Error', error.message);
-      } else {
-        Alert.alert('Error', 'Failed to send OTP. Please try again.');
+    // If mobile number is provided, send OTP first then navigate
+    if (id) {
+      try {
+        setIsLoading(true);
+        await sendLoginOTP(id);
+        // Navigate directly to OTP page with mobile number
+        router.push({
+          pathname: '/auth/login-otp',
+          params: { mobileNumber: id }
+        });
+      } catch (error) {
+        setIsLoading(false);
+        if (error instanceof Error) {
+          Alert.alert('Error', error.message);
+        } else {
+          Alert.alert('Error', 'Failed to send OTP. Please try again.');
+        }
       }
-    } finally {
-      setIsLoading(false);
+    } else {
+      // If no mobile number, navigate directly to OTP page
+      router.push('/auth/login-otp');
     }
   };
 
@@ -167,7 +202,7 @@ export default function LoginScreen() {
               <Text style={styles.inputLabel}>Mobile Number or Email</Text>
               <TextInput
                 style={styles.textInput}
-                placeholder="Enter your mobile number or email"
+                placeholder="Enter your mobile number or email address"
                 placeholderTextColor={colors.text.placeholder}
                 value={identifier}
                 onChangeText={setIdentifier}
@@ -214,7 +249,7 @@ export default function LoginScreen() {
 
             {/* Login Button */}
             <Button
-              title="Sign In"
+              title="Login"
               onPress={handleLogin}
               loading={isLoading}
               variant="primary"
@@ -243,7 +278,7 @@ export default function LoginScreen() {
                   activeOpacity={0.8}
                 >
                   <Ionicons name="phone-portrait" size={20} color={colors.text.dark} />
-                  <Text style={styles.alternativeButtonText}>OTP</Text>
+                  <Text style={styles.alternativeButtonText}>OTP Login</Text>
                 </TouchableOpacity>
               </View>
             </View>

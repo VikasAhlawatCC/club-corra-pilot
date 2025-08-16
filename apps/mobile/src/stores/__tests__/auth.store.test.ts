@@ -1,6 +1,7 @@
 import { renderHook, act } from '@testing-library/react-native';
 import { useAuthStore } from '../auth.store';
 import { otpService } from '../../services/otp.service';
+import { authService } from '../../services/auth.service';
 
 // Mock the OTP service
 jest.mock('../../services/otp.service', () => ({
@@ -8,6 +9,24 @@ jest.mock('../../services/otp.service', () => ({
     requestOtp: jest.fn(),
     verifyOtp: jest.fn(),
     resendOtp: jest.fn(),
+  },
+}));
+
+// Mock the Auth service
+jest.mock('../../services/auth.service', () => ({
+  authService: {
+    initiateSignup: jest.fn(),
+    verifyOTP: jest.fn(),
+    login: jest.fn(),
+    sendLoginOTP: jest.fn(),
+    oauthSignup: jest.fn(),
+    storeTokens: jest.fn(),
+    makeUsersRequest: jest.fn(),
+    updateProfile: jest.fn(),
+    updatePaymentDetails: jest.fn(),
+    checkServerHealth: jest.fn(),
+    loginWithMobilePassword: jest.fn(),
+    loginWithEmail: jest.fn(),
   },
 }));
 
@@ -21,11 +40,6 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 describe('Auth Store', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    // Reset store to initial state
-    const { result } = renderHook(() => useAuthStore());
-    act(() => {
-      result.current.clearAuth();
-    });
   });
 
   describe('Initial State', () => {
@@ -58,7 +72,7 @@ describe('Auth Store', () => {
       const { result } = renderHook(() => useAuthStore());
       const signupData = { mobileNumber: '+1234567890' };
 
-      (otpService.requestOtp as jest.Mock).mockResolvedValue({
+      (authService.initiateSignup as jest.Mock).mockResolvedValue({
         message: 'OTP sent successfully',
         expiresIn: 300,
       });
@@ -76,12 +90,14 @@ describe('Auth Store', () => {
       const otpCode = '123456';
 
       const mockUser = { id: '1', mobileNumber: '+1234567890' };
-      const mockTokens = { accessToken: 'token123', refreshToken: 'refresh123' };
-
-      (otpService.verifyOtp as jest.Mock).mockResolvedValue({
+      const mockResponse = {
         user: mockUser,
-        tokens: mockTokens,
-      });
+        accessToken: 'token123',
+        refreshToken: 'refresh123',
+        expiresIn: 604800,
+      };
+
+      (authService.verifyOTP as jest.Mock).mockResolvedValue(mockResponse);
 
       // Set mobile number first
       act(() => {
@@ -103,9 +119,13 @@ describe('Auth Store', () => {
       const otpCode = '123456';
 
       const mockUser = { id: '1', mobileNumber: '+1234567890' };
-      const mockTokens = { accessToken: 'token123', refreshToken: 'refresh123' };
+      const mockTokens = { 
+        accessToken: 'token123', 
+        refreshToken: 'refresh123',
+        expiresIn: 604800 
+      };
 
-      (otpService.verifyOtp as jest.Mock).mockResolvedValue({
+      (authService.login as jest.Mock).mockResolvedValue({
         user: mockUser,
         tokens: mockTokens,
       });
@@ -123,7 +143,7 @@ describe('Auth Store', () => {
       const { result } = renderHook(() => useAuthStore());
       const mobileNumber = '+1234567890';
 
-      (otpService.requestOtp as jest.Mock).mockResolvedValue({
+      (authService.sendLoginOTP as jest.Mock).mockResolvedValue({
         message: 'OTP sent successfully',
         expiresIn: 300,
       });
@@ -143,13 +163,18 @@ describe('Auth Store', () => {
       const redirectUri = 'https://example.com/callback';
 
       const mockUser = { id: '1', mobileNumber: '+1234567890' };
-      const mockTokens = { accessToken: 'token123', refreshToken: 'refresh123' };
+      const mockTokens = { 
+        accessToken: 'token123', 
+        refreshToken: 'refresh123',
+        expiresIn: 604800 
+      };
 
-      // Mock the OAuth service call
-      jest.spyOn(global, 'fetch').mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ user: mockUser, tokens: mockTokens }),
-      } as any);
+      (authService.oauthSignup as jest.Mock).mockResolvedValue({
+        user: mockUser,
+        tokens: mockTokens,
+      });
+
+      (authService.storeTokens as jest.Mock).mockResolvedValue(undefined);
 
       await act(async () => {
         await result.current.oauthSignup(provider, code, redirectUri);
@@ -166,34 +191,33 @@ describe('Auth Store', () => {
       const { result } = renderHook(() => useAuthStore());
       const profileData = { firstName: 'John', lastName: 'Doe' };
 
-      // Mock the profile update service call
-      jest.spyOn(global, 'fetch').mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ profile: profileData }),
-      } as any);
+      // Mock the auth service to return a successful response
+      (authService.updateProfile as jest.Mock).mockResolvedValue({
+        profile: { firstName: 'John', lastName: 'Doe' },
+      });
 
       await act(async () => {
         await result.current.updateProfile(profileData);
       });
 
-      expect(result.current.isLoading).toBe(false);
+      expect(result.current.user?.profile?.firstName).toBe('John');
+      expect(result.current.user?.profile?.lastName).toBe('Doe');
     });
 
     it('updates payment details', async () => {
       const { result } = renderHook(() => useAuthStore());
       const paymentData = { upiId: 'john@upi' };
 
-      // Mock the payment update service call
-      jest.spyOn(global, 'fetch').mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ paymentDetails: paymentData }),
-      } as any);
+      // Mock the auth service to return a successful response
+      (authService.updatePaymentDetails as jest.Mock).mockResolvedValue({
+        payment: { upiId: 'john@upi' },
+      });
 
       await act(async () => {
         await result.current.updatePaymentDetails(paymentData);
       });
 
-      expect(result.current.isLoading).toBe(false);
+      expect(result.current.user?.paymentDetails?.upiId).toBe('john@upi');
     });
   });
 
@@ -202,20 +226,31 @@ describe('Auth Store', () => {
       const { result } = renderHook(() => useAuthStore());
       const signupData = { mobileNumber: '+1234567890' };
 
-      // Mock a slow response
-      (otpService.requestOtp as jest.Mock).mockImplementation(
-        () => new Promise(resolve => setTimeout(() => resolve({ message: 'Success' }), 100))
-      );
+      // Create a promise that we can control
+      let resolvePromise: (value: any) => void;
+      const delayedPromise = new Promise(resolve => {
+        resolvePromise = resolve;
+      });
 
-      const updatePromise = act(async () => {
-        await result.current.initiateSignup(signupData);
+      // Mock a delayed response that we can control
+      (authService.initiateSignup as jest.Mock).mockImplementation(() => delayedPromise);
+
+      // Start the operation but don't wait for it
+      act(() => {
+        result.current.initiateSignup(signupData);
       });
 
       // Loading should be true during operation
       expect(result.current.isLoading).toBe(true);
 
-      // Wait for operation to complete
-      await updatePromise;
+      // Resolve the promise to complete the operation
+      resolvePromise!({
+        message: 'OTP sent successfully',
+        expiresIn: 300,
+      });
+
+      // Wait a bit for the operation to complete
+      await new Promise(resolve => setTimeout(resolve, 10));
 
       // Loading should be false after operation
       expect(result.current.isLoading).toBe(false);
@@ -272,7 +307,7 @@ describe('Auth Store', () => {
       const signupData = { mobileNumber: '+1234567890' };
       const errorMessage = 'Mobile number already registered';
 
-      (otpService.requestOtp as jest.Mock).mockRejectedValue(new Error(errorMessage));
+      (authService.initiateSignup as jest.Mock).mockRejectedValue(new Error(errorMessage));
 
       await expect(
         act(async () => {
@@ -293,7 +328,7 @@ describe('Auth Store', () => {
       });
 
       const errorMessage = 'Invalid OTP';
-      (otpService.verifyOtp as jest.Mock).mockRejectedValue(new Error(errorMessage));
+      (authService.verifyOTP as jest.Mock).mockRejectedValue(new Error(errorMessage));
 
       await expect(
         act(async () => {

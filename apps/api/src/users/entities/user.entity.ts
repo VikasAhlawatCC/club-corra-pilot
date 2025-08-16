@@ -43,7 +43,7 @@ export class User {
   @Column({ default: false })
   isEmailVerified: boolean;
 
-  @Column({ default: false })
+  @Column({ default: false, nullable: true })
   hasWelcomeBonusProcessed: boolean;
 
   @Column({ nullable: true })
@@ -70,6 +70,12 @@ export class User {
   @Column('simple-array', { default: 'USER' })
   roles: string[];
 
+  @Column({ nullable: true })
+  profileId: string;
+
+  @Column({ nullable: true })
+  paymentDetailsId: string;
+
   @CreateDateColumn()
   createdAt: Date;
 
@@ -78,11 +84,11 @@ export class User {
 
   // Relations
   @OneToOne(() => UserProfile, (profile) => profile.user, { cascade: true })
-  @JoinColumn()
+  @JoinColumn({ name: 'profileId' })
   profile: UserProfile;
 
   @OneToOne(() => PaymentDetails, (payment) => payment.user, { cascade: true })
-  @JoinColumn()
+  @JoinColumn({ name: 'paymentDetailsId' })
   paymentDetails: PaymentDetails;
 
   @OneToMany(() => AuthProvider, (provider) => provider.user, { cascade: true })

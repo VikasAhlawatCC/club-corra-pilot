@@ -8,10 +8,12 @@ import { Button, Card, LoadingSpinner } from '@/components/common';
 import { colors, spacing, borderRadius, typography, shadows, glassEffects, animation } from '@/styles/theme';
 import { environment } from '@/config/environment';
 import { useAuthStore } from '@/stores/auth.store';
+import { useWelcomeBonus } from '@/hooks/useWelcomeBonus';
 
 export default function NewEmailVerificationScreen() {
   const params = useLocalSearchParams();
   const { mobileNumber, userId } = params;
+  const { setWelcomeBonusFromPasswordSetup } = useWelcomeBonus();
   
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -73,6 +75,9 @@ export default function NewEmailVerificationScreen() {
 
       setIsLoading(false);
       
+      // Set welcome bonus flag for this user (they came from password setup flow)
+      await setWelcomeBonusFromPasswordSetup();
+      
       // Show success message and navigate to main app
       Alert.alert(
         'Email Added Successfully',
@@ -97,7 +102,11 @@ export default function NewEmailVerificationScreen() {
       [
         {
           text: 'Skip for Now',
-          onPress: () => router.replace('/(tabs)/home'),
+          onPress: async () => {
+            // Set welcome bonus flag even when skipping email
+            await setWelcomeBonusFromPasswordSetup();
+            router.replace('/(tabs)/home');
+          },
         },
         {
           text: 'Add Email',

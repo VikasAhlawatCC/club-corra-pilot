@@ -20,4 +20,13 @@ export class SignupOtpVerificationResponseDto {
   accessToken?: string;
   refreshToken?: string;
   expiresIn?: number;
+  user?: {
+    id: string;
+    mobileNumber: string;
+    status: string;
+    profile?: {
+      firstName: string;
+      lastName: string;
+    };
+  };
 }

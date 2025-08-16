@@ -128,6 +128,34 @@ export default function TabLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Profile',
+          tabBarIcon: ({ color, focused }) => (
+            <View style={{ alignItems: 'center' }}>
+              <View
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: borderRadius.full,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: focused ? colors.primary[500] : 'transparent',
+                  borderWidth: focused ? 0 : 1,
+                  borderColor: focused ? 'transparent' : 'rgba(255, 255, 255, 0.2)',
+                }}
+              >
+                <Ionicons
+                  name={focused ? 'person' : 'person-outline'}
+                  size={24}
+                  color={color}
+                />
+              </View>
+            </View>
+          ),
+        }}
+      />
     </Tabs>
   );
 }

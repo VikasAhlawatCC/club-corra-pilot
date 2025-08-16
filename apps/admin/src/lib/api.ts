@@ -200,7 +200,7 @@ export const brandApi = {
     if (categoryId) params.append('categoryId', categoryId)
     if (isActive !== undefined) params.append('isActive', isActive.toString())
     
-    return apiRequest<{ data: Brand[], total: number, page: number, limit: number, totalPages: number }>(
+    return apiRequest<{ brands: Brand[], total: number, page: number, limit: number, totalPages: number }>(
       `/brands?${params.toString()}`
     )
   },
@@ -277,6 +277,18 @@ export const categoryApi = {
 
 // User Management API
 export const userApi = {
+  // Get all users
+  getAllUsers: () =>
+    apiRequest<{ success: boolean, message: string, data: any[] }>(
+      '/admin/users'
+    ),
+
+  // Get user statistics
+  getUserStats: () =>
+    apiRequest<{ success: boolean, message: string, data: any }>(
+      '/admin/users/stats'
+    ),
+
   // Get user balance
   getUserBalance: (userId: string) =>
     apiRequest<{ success: boolean, message: string, data: { balance: any } }>(

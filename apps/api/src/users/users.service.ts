@@ -6,7 +6,6 @@ import { UserProfile, Gender } from './entities/user-profile.entity';
 import { PaymentDetails } from './entities/payment-details.entity';
 import { AuthProvider, ProviderType } from './entities/auth-provider.entity';
 import { SignupDto, OAuthSignupDto } from '../auth/dto/signup.dto';
-import { CoinsService } from '../coins/coins.service';
 import { AUTH_CONSTANTS } from '../common/constants/auth.constants';
 import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
@@ -24,7 +23,6 @@ export class UsersService {
     private paymentDetailsRepository: Repository<PaymentDetails>,
     @InjectRepository(AuthProvider)
     private authProviderRepository: Repository<AuthProvider>,
-    private coinsService: CoinsService,
   ) {}
 
   async createUser(signupDto: SignupDto): Promise<User> {
@@ -90,21 +88,8 @@ export class UsersService {
       await this.authProviderRepository.save(authProvider);
     }
 
-    // Create welcome bonus for new user
-    try {
-      await this.coinsService.createWelcomeBonus({
-        userId: savedUser.id,
-        mobileNumber: savedUser.mobileNumber,
-      });
-      this.logger.log(`Welcome bonus created successfully for user ${savedUser.id}`);
-    } catch (error) {
-      // Log error but don't fail user creation for pilot
-      // In production, consider implementing retry logic or failing user creation
-      this.logger.error(`Failed to create welcome bonus for user ${savedUser.id}:`, error);
-      
-      // For pilot: continue with user creation but mark for manual review
-      // In production: implement proper retry mechanism or fail gracefully
-    }
+    // Welcome bonus will be processed manually through mobile app flow
+    // to prevent double welcome bonuses
 
     // Reload user with relations
     return this.findById(savedUser.id);
@@ -165,21 +150,8 @@ export class UsersService {
 
     await this.authProviderRepository.save(authProvider);
 
-    // Create welcome bonus for new OAuth user
-    try {
-      await this.coinsService.createWelcomeBonus({
-        userId: savedUser.id,
-        mobileNumber: savedUser.mobileNumber,
-      });
-      this.logger.log(`Welcome bonus created successfully for OAuth user ${savedUser.id}`);
-    } catch (error) {
-      // Log error but don't fail user creation for pilot
-      // In production, consider implementing retry logic or failing user creation
-      this.logger.error(`Failed to create welcome bonus for OAuth user ${savedUser.id}:`, error);
-      
-      // For pilot: continue with user creation but mark for manual review
-      // In production: implement proper retry mechanism or fail gracefully
-    }
+    // Welcome bonus will be processed manually through mobile app flow
+    // to prevent double welcome bonuses
 
     // Reload user with relations
     return this.findById(savedUser.id);
@@ -468,17 +440,8 @@ export class UsersService {
 
     await this.paymentDetailsRepository.save(paymentDetails);
 
-    // Create welcome bonus for new user
-    try {
-      await this.coinsService.createWelcomeBonus({
-        userId: savedUser.id,
-        mobileNumber: savedUser.mobileNumber,
-      });
-      this.logger.log(`Welcome bonus created successfully for minimal user ${savedUser.id}`);
-    } catch (error) {
-      // Log error but don't fail user creation for pilot
-      this.logger.error(`Failed to create welcome bonus for minimal user ${savedUser.id}:`, error);
-    }
+    // Welcome bonus will be processed manually through mobile app flow
+    // to prevent double welcome bonuses
 
     // Reload user with relations
     return this.findById(savedUser.id);
@@ -516,26 +479,23 @@ export class UsersService {
       userId: savedUser.id,
     });
 
-    await this.userProfileRepository.save(profile);
+    const savedProfile = await this.userProfileRepository.save(profile);
 
     // Create empty payment details
     const paymentDetails = this.paymentDetailsRepository.create({
       userId: savedUser.id,
     });
 
-    await this.paymentDetailsRepository.save(paymentDetails);
+    const savedPaymentDetails = await this.paymentDetailsRepository.save(paymentDetails);
 
-    // Create welcome bonus for new user
-    try {
-      await this.coinsService.createWelcomeBonus({
-        userId: savedUser.id,
-        mobileNumber: savedUser.mobileNumber,
-      });
-      this.logger.log(`Welcome bonus created successfully for initial user ${savedUser.id}`);
-    } catch (error) {
-      // Log error but don't fail user creation for pilot
-      this.logger.error(`Failed to create welcome bonus for initial user ${savedUser.id}:`, error);
-    }
+    // Update user with the profile and payment details IDs
+    await this.userRepository.update(savedUser.id, {
+      profileId: savedProfile.id,
+      paymentDetailsId: savedPaymentDetails.id,
+    });
+
+    // Welcome bonus will be processed manually through mobile app flow
+    // to prevent double welcome bonuses
 
     // Reload user with relations
     return this.findById(savedUser.id);
@@ -559,5 +519,66 @@ export class UsersService {
 
     // Update user with email
     await this.userRepository.update(userId, { email });
+  }
+
+  /**
+   * Get all users with their profiles and coin balances for admin purposes
+   * @returns Promise<User[]> - Array of users with relations
+   */
+  async findAllUsers(): Promise<User[]> {
+    try {
+      // First try without relations to see if basic query works
+      const users = await this.userRepository.find({
+        order: { createdAt: 'DESC' },
+      });
+      
+      console.log(`Found ${users.length} users without relations`);
+      
+      // If basic query works, try with relations
+      const usersWithRelations = await this.userRepository.find({
+        relations: ['profile', 'coinBalance'],
+        order: { createdAt: 'DESC' },
+      });
+      
+      console.log(`Found ${usersWithRelations.length} users with relations`);
+      
+      return usersWithRelations;
+    } catch (error) {
+      console.error('Error in findAllUsers:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get user statistics for admin dashboard
+   * @returns Promise<{ totalUsers: number; activeUsers: number; pendingUsers: number; totalCoins: number }>
+   */
+  async getUserStats(): Promise<{
+    totalUsers: number;
+    activeUsers: number;
+    pendingUsers: number;
+    totalCoins: number;
+  }> {
+    const [totalUsers, activeUsers, pendingUsers] = await Promise.all([
+      this.userRepository.count(),
+      this.userRepository.count({ where: { status: UserStatus.ACTIVE } }),
+      this.userRepository.count({ where: { status: UserStatus.PENDING } }),
+    ]);
+
+    // Get total coins across all users
+    const totalCoinsResult = await this.userRepository
+      .createQueryBuilder('user')
+      .leftJoin('user.coinBalance', 'coinBalance')
+      .select('COALESCE(SUM(coinBalance.balance), 0)', 'totalCoins')
+      .getRawOne();
+
+    const totalCoins = parseFloat(totalCoinsResult?.totalCoins || '0');
+
+    return {
+      totalUsers,
+      activeUsers,
+      pendingUsers,
+      totalCoins,
+    };
   }
 }

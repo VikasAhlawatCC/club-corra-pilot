@@ -4,10 +4,12 @@ import { Admin, AdminRole, AdminStatus } from './admin.entity';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AdminGuard } from '../auth/guards/admin.guard';
 
-@Controller('admin')
+@Controller('admin/management')
 @UseGuards(JwtAuthGuard, AdminGuard)
 export class AdminController {
-  constructor(private readonly adminService: AdminService) {}
+  constructor(
+    private readonly adminService: AdminService,
+  ) {}
 
   @Post()
   async createAdmin(@Body() adminData: {

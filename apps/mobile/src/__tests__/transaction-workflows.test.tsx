@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
-import { AuthProvider } from '../providers/AuthProvider';
+// AuthProvider removed - using Zustand store directly
 import { RealTimeProvider } from '../providers/RealTimeProvider';
 import { ThemeProvider } from '../providers/ThemeProvider';
 
@@ -184,11 +184,9 @@ describe('Transaction Workflow Tests', () => {
     it('should display available brands for earning', () => {
       const { getByText, getByTestId } = render(
         <ThemeProvider>
-          <AuthProvider>
-            <RealTimeProvider>
-              <div>Earn Coins Screen</div>
-            </RealTimeProvider>
-          </AuthProvider>
+          <RealTimeProvider>
+            <div>Earn Coins Screen</div>
+          </RealTimeProvider>
         </ThemeProvider>
       );
 

@@ -38,8 +38,8 @@ async function viewBrands() {
       console.log(`${index + 1}. ${brand.name}`);
       console.log(`   Category: ${brand.category_name || 'N/A'}`);
       console.log(`   Description: ${brand.description}`);
-      console.log(`   Earning: ${brand.earning_percentage}% | Redemption: ${brand.redemption_percentage}%`);
-      console.log(`   Min/Max Redemption: $${brand.min_redemption_amount} - $${brand.max_redemption_amount}`);
+      console.log(`   Earning: ${brand.earningPercentage}% | Redemption: ${brand.redemptionPercentage}%`);
+      console.log(`   Min/Max Redemption: $${brand.minRedemptionAmount} - $${brand.maxRedemptionAmount}`);
       console.log('');
     });
 

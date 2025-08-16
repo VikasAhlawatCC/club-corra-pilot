@@ -91,7 +91,7 @@ export class BrandsService {
       const totalPages = Math.ceil(total / limit);
 
       return {
-        data: brands,
+        brands,
         total,
         page,
         limit,
@@ -151,7 +151,7 @@ export class BrandsService {
     const totalPages = Math.ceil(total / limit);
 
     return {
-      data: brands,
+      brands,
       total,
       page,
       limit,

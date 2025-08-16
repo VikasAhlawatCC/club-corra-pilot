@@ -1,7 +1,7 @@
 import { Brand } from '../entities/brand.entity';
 
 export class BrandListResponseDto {
-  data: Brand[];
+  brands: Brand[];
   total: number;
   page: number;
   limit: number;

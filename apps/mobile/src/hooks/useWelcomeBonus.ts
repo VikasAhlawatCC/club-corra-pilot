@@ -1,93 +1,93 @@
-import { useState, useEffect } from 'react';
-import { useAuthStore } from '@/stores/auth.store';
-import { useCoinsStore } from '@/stores/coins.store';
+import { useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuthStore } from '../stores/auth.store';
+import { useCoinsStore } from '../stores/coins.store';
 
 const WELCOME_BONUS_SHOWN_KEY = 'welcome_bonus_shown';
+const WELCOME_BONUS_PROCESSED_KEY = 'welcome_bonus_processed';
+const WELCOME_BONUS_FROM_PASSWORD_SETUP_KEY = 'welcome_bonus_from_password_setup';
 
 export const useWelcomeBonus = () => {
-  const [shouldShowAnimation, setShouldShowAnimation] = useState(false);
-  const [hasShownWelcomeBonus, setHasShownWelcomeBonus] = useState(false);
   const { user, isAuthenticated } = useAuthStore();
-  const { balance } = useCoinsStore();
+  const { processWelcomeBonus, fetchBalance } = useCoinsStore();
+  const [shouldShowAnimation, setShouldShowAnimation] = useState(false);
 
-  useEffect(() => {
+  const checkWelcomeBonusStatus = useCallback(async () => {
+    if (!user?.id) return;
+
+    const shownKey = `${WELCOME_BONUS_SHOWN_KEY}_${user.id}`;
+    const processedKey = `${WELCOME_BONUS_PROCESSED_KEY}_${user.id}`;
+    const fromPasswordSetupKey = `${WELCOME_BONUS_FROM_PASSWORD_SETUP_KEY}_${user.id}`;
+
     try {
-      // Safety check: ensure balance is available before checking welcome bonus
-      if (balance && typeof balance === 'object') {
-        if (typeof checkWelcomeBonusStatus === 'function') {
-          checkWelcomeBonusStatus();
-        }
-      } else {
-        // Balance not available yet, don't show animation
-        setShouldShowAnimation(false);
-      }
-    } catch (error) {
-      console.error('Error in useWelcomeBonus useEffect:', error);
-      setShouldShowAnimation(false);
-    }
-  }, [user, isAuthenticated, balance]);
+      const [hasShown, hasProcessed, fromPasswordSetup] = await Promise.all([
+        AsyncStorage.getItem(shownKey),
+        AsyncStorage.getItem(processedKey),
+        AsyncStorage.getItem(fromPasswordSetupKey),
+      ]);
 
-  const checkWelcomeBonusStatus = async () => {
-    try {
-      // Safety check: ensure user exists and has an ID
-      if (!user?.id) {
-        console.log('User not available yet, skipping welcome bonus check');
-        setShouldShowAnimation(false);
-        return;
-      }
-
-      // Check if we've already shown the welcome bonus for this user
-      const storedKey = `${WELCOME_BONUS_SHOWN_KEY}_${user.id}`;
-      const hasShown = await AsyncStorage.getItem(storedKey);
-      
-      if (hasShown === 'true') {
-        setHasShownWelcomeBonus(true);
-        setShouldShowAnimation(false);
-        return;
-      }
-
-      // Check if user is authenticated and has coins
-      if (isAuthenticated && user && balance && typeof balance === 'object') {
-        // Check if this is a new user with welcome bonus
-        const hasWelcomeBonus = balance.balance >= 100 && balance.totalEarned >= 100;
-        
-        if (hasWelcomeBonus && !hasShown) {
+      // Only show welcome bonus if user came from password setup flow
+      if (fromPasswordSetup === 'true' && !hasShown) {
+        // If welcome bonus hasn't been processed yet, process it
+        if (!hasProcessed && user.mobileNumber) {
+          await processWelcomeBonus(user.id, user.mobileNumber);
+          await AsyncStorage.setItem(processedKey, 'true');
           setShouldShowAnimation(true);
-        } else {
-          setShouldShowAnimation(false);
+          await fetchBalance();
+        } else if (hasProcessed && !hasShown) {
+          // If processed but animation not shown, show it
+          setShouldShowAnimation(true);
         }
-      } else {
-        // User not authenticated or balance not available yet
-        setShouldShowAnimation(false);
       }
     } catch (error) {
       console.error('Error checking welcome bonus status:', error);
-      setShouldShowAnimation(false);
     }
-  };
+  }, [user?.id, user?.mobileNumber, processWelcomeBonus, fetchBalance]);
+
+  useEffect(() => {
+    if (isAuthenticated && user?.id) {
+      checkWelcomeBonusStatus();
+    }
+  }, [isAuthenticated, user?.id, checkWelcomeBonusStatus]);
 
   const markWelcomeBonusAsShown = async () => {
+    if (!user?.id) return;
+    
     try {
-      if (user?.id) {
-        const storedKey = `${WELCOME_BONUS_SHOWN_KEY}_${user.id}`;
-        await AsyncStorage.setItem(storedKey, 'true');
-        setHasShownWelcomeBonus(true);
-        setShouldShowAnimation(false);
-      }
+      const shownKey = `${WELCOME_BONUS_SHOWN_KEY}_${user.id}`;
+      await AsyncStorage.setItem(shownKey, 'true');
+      setShouldShowAnimation(false);
     } catch (error) {
       console.error('Error marking welcome bonus as shown:', error);
     }
   };
 
-  const resetWelcomeBonusStatus = async () => {
+  const setWelcomeBonusFromPasswordSetup = async () => {
+    if (!user?.id) return;
+    
     try {
-      if (user?.id) {
-        const storedKey = `${WELCOME_BONUS_SHOWN_KEY}_${user.id}`;
-        await AsyncStorage.removeItem(storedKey);
-        setHasShownWelcomeBonus(false);
-        setShouldShowAnimation(false);
-      }
+      const fromPasswordSetupKey = `${WELCOME_BONUS_FROM_PASSWORD_SETUP_KEY}_${user.id}`;
+      await AsyncStorage.setItem(fromPasswordSetupKey, 'true');
+    } catch (error) {
+      console.error('Error setting welcome bonus from password setup:', error);
+    }
+  };
+
+  const resetWelcomeBonusStatus = async () => {
+    if (!user?.id) return;
+    
+    try {
+      const shownKey = `${WELCOME_BONUS_SHOWN_KEY}_${user.id}`;
+      const processedKey = `${WELCOME_BONUS_PROCESSED_KEY}_${user.id}`;
+      const fromPasswordSetupKey = `${WELCOME_BONUS_FROM_PASSWORD_SETUP_KEY}_${user.id}`;
+      
+      await Promise.all([
+        AsyncStorage.removeItem(shownKey),
+        AsyncStorage.removeItem(processedKey),
+        AsyncStorage.removeItem(fromPasswordSetupKey),
+      ]);
+      
+      setShouldShowAnimation(false);
     } catch (error) {
       console.error('Error resetting welcome bonus status:', error);
     }
@@ -95,9 +95,10 @@ export const useWelcomeBonus = () => {
 
   return {
     shouldShowAnimation,
-    hasShownWelcomeBonus,
     markWelcomeBonusAsShown,
+    setWelcomeBonusFromPasswordSetup,
     resetWelcomeBonusStatus,
   };
 };
+
 

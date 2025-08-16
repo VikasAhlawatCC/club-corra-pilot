@@ -247,7 +247,8 @@ export const WelcomeBonusAnimation: React.FC<WelcomeBonusAnimationProps> = ({
       {/* Graffiti Style Welcome Bonus Text */}
       <Animated.View style={[styles.graffitiContainer, graffitiAnimatedStyle as any]}>
         <Text style={styles.graffitiText}>🎉 WELCOME BONUS! 🎉</Text>
-        <Text style={styles.graffitiSubtext}>100 COINS ADDED!</Text>
+        <Text style={styles.graffitiSubtext}>100 COINS ADDED TO YOUR WALLET!</Text>
+        <Text style={styles.graffitiDescription}>Welcome to Club Corra!</Text>
       </Animated.View>
 
       {/* Celebration Icons */}
@@ -389,6 +390,14 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 4,
     transform: [{ skewX: '3deg' }],
+  },
+
+  graffitiDescription: {
+    fontSize: typography.fontSize.md,
+    fontFamily: typography.fontFamily.medium,
+    color: colors.text.secondary,
+    textAlign: 'center',
+    marginTop: spacing[1],
   },
   
   // Celebration icons

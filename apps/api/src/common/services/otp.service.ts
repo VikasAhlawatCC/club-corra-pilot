@@ -4,7 +4,8 @@ import { Repository } from 'typeorm';
 import { OTP, OTPType, OTPStatus } from '../entities/otp.entity';
 import { ConfigService } from '@nestjs/config';
 import { RateLimitService } from './rate-limit.service';
-import { AUTH_CONSTANTS, generateOTP } from '@shared/index';
+import { AUTH_CONSTANTS } from '../constants/auth.constants';
+import { generateOTP } from '@shared/index';
 import * as bcrypt from 'bcryptjs';
 
 @Injectable()
@@ -38,7 +39,7 @@ export class OtpService {
     
     // Set expiration using shared constant
     const expiresAt = new Date();
-    expiresAt.setMinutes(expiresAt.getMinutes() + AUTH_CONSTANTS.OTP_EXPIRY_MINUTES);
+    expiresAt.setMinutes(expiresAt.getMinutes() + AUTH_CONSTANTS.OTP.EXPIRY_MINUTES);
 
     // Invalidate any existing pending OTPs for this identifier
     await this.otpRepository.update(

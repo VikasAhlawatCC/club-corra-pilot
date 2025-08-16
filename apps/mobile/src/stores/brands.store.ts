@@ -43,7 +43,9 @@ export const useBrandsStore = create<BrandsState>((set, get) => ({
   fetchBrands: async (searchParams = { page: 1, limit: 20 }) => {
     try {
       set({ isLoading: true, error: null });
+      console.log('🔍 Fetching brands with params:', searchParams);
       const response = await brandsService.getBrands(searchParams);
+      console.log('✅ Brands response:', response);
       
       set({
         brands: response.brands,
@@ -53,7 +55,9 @@ export const useBrandsStore = create<BrandsState>((set, get) => ({
         totalPages: response.totalPages,
         isLoading: false,
       });
+      console.log('📱 Brands state updated with', response.brands?.length || 0, 'brands');
     } catch (error) {
+      console.error('❌ Error fetching brands:', error);
       set({ 
         error: error instanceof Error ? error.message : 'Failed to fetch brands',
         isLoading: false 

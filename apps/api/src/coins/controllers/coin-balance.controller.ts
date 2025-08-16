@@ -20,8 +20,13 @@ export class CoinBalanceController {
   @ApiOperation({ summary: 'Get current user coin balance' })
   @ApiResponse({ status: 200, description: 'Balance retrieved successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  getBalance(@Request() req) {
-    return this.coinsService.getUserBalance(req.user.sub);
+  async getBalance(@Request() req) {
+    console.log('[CoinBalanceController] Getting balance for user:', req.user.sub);
+    const balance = await this.coinsService.getUserBalance(req.user.sub);
+    console.log('[CoinBalanceController] Raw balance from service:', balance);
+    console.log('[CoinBalanceController] Balance type:', typeof balance.balance);
+    console.log('[CoinBalanceController] Balance value:', balance.balance);
+    return balance;
   }
 
   @Get(':userId')

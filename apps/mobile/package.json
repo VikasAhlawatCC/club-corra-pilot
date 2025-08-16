@@ -11,7 +11,13 @@
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:cov": "jest --coverage"
+    "test:cov": "jest --coverage",
+    "switch:localhost": "node scripts/switch-server.js localhost",
+    "switch:home": "node scripts/switch-server.js home",
+    "switch:office": "node scripts/switch-server.js office",
+    "switch:hotspot": "node scripts/switch-server.js hotspot",
+    "switch:production": "node scripts/switch-server.js production",
+    "switch:list": "node scripts/switch-server.js list"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.3.2",

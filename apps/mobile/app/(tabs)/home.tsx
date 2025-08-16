@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Modal, Image, RefreshControl, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Modal, Image, RefreshControl, ActivityIndicator, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,14 +9,17 @@ import { WelcomeBonusAnimation } from '@/components/common';
 import { useWelcomeBonus } from '@/hooks/useWelcomeBonus';
 import { useBrandsStore } from '@/stores/brands.store';
 import { useCoinBalance } from '@/hooks/useCoinBalance';
+import { useAuthStore } from '@/stores/auth.store';
 
 export default function HomeScreen() {
   const router = useRouter();
   const { shouldShowAnimation, markWelcomeBonusAsShown } = useWelcomeBonus();
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   
   const { brands, fetchBrands, isLoading: brandsLoading } = useBrandsStore();
   const { balance, totalEarned, totalRedeemed, refreshBalance, isRefreshing } = useCoinBalance();
+  const { user } = useAuthStore();
 
   useEffect(() => {
     try {
@@ -87,6 +90,11 @@ export default function HomeScreen() {
   // Use real brands from API with safety checks
   const partnerBrands = Array.isArray(brands) ? brands.filter(brand => brand?.isActive === true) : [];
 
+  // Filter brands based on search query
+  const filteredBrands = partnerBrands.filter(brand => 
+    brand.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
     <SafeAreaView style={styles.container}>
       <LinearGradient
@@ -117,6 +125,15 @@ export default function HomeScreen() {
               </View>
             </View>
           </View>
+
+          {/* Welcome Message Section */}
+          {user && (
+            <View style={styles.welcomeMessageSection}>
+              <Text style={styles.welcomeMessage}>
+                Welcome back, {user.profile?.firstName || 'User'}!
+              </Text>
+            </View>
+          )}
 
           {/* Wallet Balance Section */}
           <View style={styles.walletSection}>
@@ -176,20 +193,54 @@ export default function HomeScreen() {
             <Text style={styles.sectionTitle}>Partner Brands</Text>
             <Text style={styles.sectionSubtitle}>Tap to earn or redeem coins</Text>
             
+            {/* Search Input */}
+            <View style={styles.searchContainer}>
+              <View style={styles.searchInputContainer}>
+                <Ionicons name="search" size={20} color={colors.text.secondary} style={styles.searchIcon} />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Search brands..."
+                  placeholderTextColor={colors.text.secondary}
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                {searchQuery.length > 0 && (
+                  <TouchableOpacity
+                    style={styles.clearButton}
+                    onPress={() => setSearchQuery('')}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="close-circle" size={20} color={colors.text.secondary} />
+                  </TouchableOpacity>
+                )}
+              </View>
+              {searchQuery.length > 0 && (
+                <Text style={styles.searchResultsCount}>
+                  {filteredBrands.length} brand{filteredBrands.length !== 1 ? 's' : ''} found
+                </Text>
+              )}
+            </View>
+            
             {brandsLoading ? (
               <View style={styles.brandsLoading}>
                 <ActivityIndicator size="large" color={colors.gold[500]} />
                 <Text style={styles.brandsLoadingText}>Loading brands...</Text>
               </View>
-            ) : partnerBrands.length === 0 ? (
+            ) : filteredBrands.length === 0 ? (
               <View style={styles.brandsEmpty}>
-                <Ionicons name="storefront-outline" size={48} color={colors.gray[400]} />
-                <Text style={styles.brandsEmptyText}>No brands available</Text>
-                <Text style={styles.brandsEmptySubtext}>Check back later for partner brands</Text>
+                <Ionicons name="search-outline" size={48} color={colors.gray[400]} />
+                <Text style={styles.brandsEmptyText}>
+                  {searchQuery ? `No brands found for "${searchQuery}"` : 'No brands available'}
+                </Text>
+                <Text style={styles.brandsEmptySubtext}>
+                  {searchQuery ? 'Try a different search term' : 'Check back later for partner brands'}
+                </Text>
               </View>
             ) : (
               <View style={styles.brandsGrid}>
-                {partnerBrands.map((brand) => (
+                {filteredBrands.map((brand) => (
                 <TouchableOpacity
                   key={brand.id}
                   style={styles.brandCard}
@@ -204,37 +255,13 @@ export default function HomeScreen() {
                     </View>
                   )}
                   <Text style={styles.brandName}>{brand.name}</Text>
-                  <View style={styles.brandInfo}>
-                    <Text style={styles.brandPercentage}>{brand.earningPercentage}% earn</Text>
-                    <Text style={styles.brandPercentage}>{brand.redemptionPercentage}% redeem</Text>
-                  </View>
                 </TouchableOpacity>
               ))}
               </View>
             )}
           </View>
 
-          {/* Welcome Bonus Section - Only show if animation hasn't been shown */}
-          {!shouldShowAnimation && (
-            <View style={styles.bonusSection}>
-              <View style={styles.bonusCard}>
-                <View style={styles.bonusIcon}>
-                  <Ionicons name="star" size={32} color={colors.gold[700]} />
-                </View>
-                <Text style={styles.bonusTitle}>🎉 Welcome Bonus!</Text>
-                <Text style={styles.bonusDescription}>
-                  You've earned 100 coins for joining Club Corra. Start earning more by uploading your first bill!
-                </Text>
-                <TouchableOpacity 
-                  style={styles.bonusButton}
-                  onPress={handleEarnCoins}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.bonusButtonText}>Upload Bill</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
+          {/* Welcome Bonus Section - REMOVED - Only show via modal animation */}
         </ScrollView>
 
         {/* Welcome Bonus Animation Modal */}
@@ -311,6 +338,18 @@ const styles = StyleSheet.create({
   tagline: {
     fontSize: typography.fontSize.md,
     color: colors.text.gold,
+    fontFamily: typography.fontFamily.medium,
+  },
+
+  // Welcome Message Section
+  welcomeMessageSection: {
+    paddingHorizontal: spacing[6],
+    paddingTop: spacing[4],
+    paddingBottom: spacing[2],
+  },
+  welcomeMessage: {
+    fontSize: typography.fontSize.lg,
+    color: colors.text.primary,
     fontFamily: typography.fontFamily.medium,
   },
 
@@ -451,8 +490,8 @@ const styles = StyleSheet.create({
     marginBottom: spacing[4],
   },
   brandIcon: {
-    width: 64,
-    height: 64,
+    width: 80,
+    height: 80,
     borderRadius: borderRadius.full,
     backgroundColor: colors.primary[500],
     alignItems: 'center',
@@ -463,7 +502,7 @@ const styles = StyleSheet.create({
     borderColor: colors.primary[400],
   },
   brandInitial: {
-    fontSize: typography.fontSize.xl,
+    fontSize: typography.fontSize['2xl'],
     fontFamily: typography.fontFamily.bold,
     color: colors.text.white,
   },
@@ -474,18 +513,9 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.medium,
     marginBottom: spacing[2],
   },
-  brandInfo: {
-    alignItems: 'center',
-  },
-  brandPercentage: {
-    fontSize: typography.fontSize.xs,
-    color: colors.text.secondary,
-    fontFamily: typography.fontFamily.regular,
-    marginTop: spacing[1],
-  },
   brandLogo: {
-    width: 64,
-    height: 64,
+    width: 80,
+    height: 80,
     borderRadius: borderRadius.full,
     marginBottom: spacing[2],
     ...shadows.md,
@@ -566,6 +596,42 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.md,
     color: colors.text.dark,
     fontFamily: typography.fontFamily.semiBold,
+  },
+
+  // Search Input Styles
+  searchContainer: {
+    marginBottom: spacing[4],
+  },
+  searchInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: glassEffects.card.backgroundColor,
+    borderRadius: borderRadius.lg,
+    paddingHorizontal: spacing[4],
+    paddingVertical: spacing[2],
+    borderWidth: 1,
+    borderColor: glassEffects.card.borderColor,
+    ...shadows.md,
+  },
+  searchIcon: {
+    marginRight: spacing[3],
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: typography.fontSize.md,
+    color: colors.text.primary,
+    paddingVertical: 0,
+    fontFamily: typography.fontFamily.regular,
+  },
+  clearButton: {
+    padding: spacing[2],
+  },
+  searchResultsCount: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.secondary,
+    marginTop: spacing[2],
+    fontFamily: typography.fontFamily.medium,
+    textAlign: 'center',
   },
 
   // Modal Styles

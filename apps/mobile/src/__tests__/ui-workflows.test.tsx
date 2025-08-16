@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
-import { AuthProvider } from '../providers/AuthProvider';
+// AuthProvider removed - using Zustand store directly
 import { RealTimeProvider } from '../providers/RealTimeProvider';
 import { ThemeProvider } from '../providers/ThemeProvider';
 import EarnCoinsScreen from '../screens/transactions/EarnCoinsScreen';
@@ -196,11 +196,11 @@ describe('Mobile App UI Workflows', () => {
     it('should render authentication screens correctly', () => {
       const { getByText } = render(
         <ThemeProvider>
-          <AuthProvider>
+          
             <RealTimeProvider>
               <EarnCoinsScreen />
             </RealTimeProvider>
-          </AuthProvider>
+          
         </ThemeProvider>
       );
 
@@ -219,11 +219,11 @@ describe('Mobile App UI Workflows', () => {
 
       const { getByText } = render(
         <ThemeProvider>
-          <AuthProvider>
+          
             <RealTimeProvider>
               <EarnCoinsScreen />
             </RealTimeProvider>
-          </AuthProvider>
+          
         </ThemeProvider>
       );
 
@@ -236,11 +236,11 @@ describe('Mobile App UI Workflows', () => {
     it('should render earn coins screen with brand selection', () => {
       const { getByText, getByTestId } = render(
         <ThemeProvider>
-          <AuthProvider>
+          
             <RealTimeProvider>
               <EarnCoinsScreen />
             </RealTimeProvider>
-          </AuthProvider>
+          
         </ThemeProvider>
       );
 
@@ -273,11 +273,11 @@ describe('Mobile App UI Workflows', () => {
 
       const { getByText, getByPlaceholderText } = render(
         <ThemeProvider>
-          <AuthProvider>
+          
             <RealTimeProvider>
               <EarnCoinsScreen />
             </RealTimeProvider>
-          </AuthProvider>
+          
         </ThemeProvider>
       );
 
@@ -296,11 +296,11 @@ describe('Mobile App UI Workflows', () => {
 
       const { getByText } = render(
         <ThemeProvider>
-          <AuthProvider>
+          
             <RealTimeProvider>
               <EarnCoinsScreen />
             </RealTimeProvider>
-          </AuthProvider>
+          
         </ThemeProvider>
       );
 
@@ -313,11 +313,11 @@ describe('Mobile App UI Workflows', () => {
     it('should render redeem coins screen with available balance', () => {
       const { getByText } = render(
         <ThemeProvider>
-          <AuthProvider>
+          
             <RealTimeProvider>
               <RedeemCoinsScreen />
             </RealTimeProvider>
-          </AuthProvider>
+          
         </ThemeProvider>
       );
 
@@ -329,11 +329,11 @@ describe('Mobile App UI Workflows', () => {
     it('should handle redemption amount selection', () => {
       const { getByText, getByTestId } = render(
         <ThemeProvider>
-          <AuthProvider>
+          
             <RealTimeProvider>
               <RedeemCoinsScreen />
             </RealTimeProvider>
-          </AuthProvider>
+          
         </ThemeProvider>
       );
 
@@ -362,11 +362,11 @@ describe('Mobile App UI Workflows', () => {
 
       const { getByText } = render(
         <ThemeProvider>
-          <AuthProvider>
+          
             <RealTimeProvider>
               <RedeemCoinsScreen />
             </RealTimeProvider>
-          </AuthProvider>
+          
         </ThemeProvider>
       );
 
@@ -379,11 +379,11 @@ describe('Mobile App UI Workflows', () => {
     it('should render transaction history with all transactions', () => {
       const { getByText, getAllByTestId } = render(
         <ThemeProvider>
-          <AuthProvider>
+          
             <RealTimeProvider>
               <TransactionHistoryScreen />
             </RealTimeProvider>
-          </AuthProvider>
+          
         </ThemeProvider>
       );
 
@@ -402,11 +402,11 @@ describe('Mobile App UI Workflows', () => {
     it('should handle transaction filtering', () => {
       const { getByText, getByTestId } = render(
         <ThemeProvider>
-          <AuthProvider>
+          
             <RealTimeProvider>
               <TransactionHistoryScreen />
             </RealTimeProvider>
-          </AuthProvider>
+          
         </ThemeProvider>
       );
 
@@ -419,11 +419,11 @@ describe('Mobile App UI Workflows', () => {
     it('should show transaction status indicators', () => {
       const { getByText } = render(
         <ThemeProvider>
-          <AuthProvider>
+          
             <RealTimeProvider>
               <TransactionHistoryScreen />
             </RealTimeProvider>
-          </AuthProvider>
+          
         </ThemeProvider>
       );
 
@@ -437,11 +437,11 @@ describe('Mobile App UI Workflows', () => {
     it('should render transaction details correctly', () => {
       const { getByText, getByTestId } = render(
         <ThemeProvider>
-          <AuthProvider>
+          
             <RealTimeProvider>
               <TransactionDetailScreen />
             </RealTimeProvider>
-          </AuthProvider>
+          
         </ThemeProvider>
       );
 
@@ -455,11 +455,11 @@ describe('Mobile App UI Workflows', () => {
     it('should show brand information for transactions', () => {
       const { getByText } = render(
         <ThemeProvider>
-          <AuthProvider>
+          
             <RealTimeProvider>
               <TransactionDetailScreen />
             </RealTimeProvider>
-          </AuthProvider>
+          
         </ThemeProvider>
       );
 
@@ -480,11 +480,11 @@ describe('Mobile App UI Workflows', () => {
 
       const { getByText } = render(
         <ThemeProvider>
-          <AuthProvider>
+          
             <RealTimeProvider>
               <TransactionHistoryScreen />
             </RealTimeProvider>
-          </AuthProvider>
+          
         </ThemeProvider>
       );
 
@@ -501,11 +501,11 @@ describe('Mobile App UI Workflows', () => {
 
       const { getByText } = render(
         <ThemeProvider>
-          <AuthProvider>
+          
             <RealTimeProvider>
               <TransactionHistoryScreen />
             </RealTimeProvider>
-          </AuthProvider>
+          
         </ThemeProvider>
       );
 
@@ -524,11 +524,11 @@ describe('Mobile App UI Workflows', () => {
 
       const { getByText } = render(
         <ThemeProvider>
-          <AuthProvider>
+          
             <RealTimeProvider>
               <TransactionHistoryScreen />
             </RealTimeProvider>
-          </AuthProvider>
+          
         </ThemeProvider>
       );
 
@@ -544,11 +544,11 @@ describe('Mobile App UI Workflows', () => {
 
       const { getByText } = render(
         <ThemeProvider>
-          <AuthProvider>
+          
             <RealTimeProvider>
               <TransactionHistoryScreen />
             </RealTimeProvider>
-          </AuthProvider>
+          
         </ThemeProvider>
       );
 
@@ -566,11 +566,11 @@ describe('Mobile App UI Workflows', () => {
 
       const { getByText } = render(
         <ThemeProvider>
-          <AuthProvider>
+          
             <RealTimeProvider>
               <TransactionHistoryScreen />
             </RealTimeProvider>
-          </AuthProvider>
+          
         </ThemeProvider>
       );
 
@@ -586,11 +586,11 @@ describe('Mobile App UI Workflows', () => {
 
       const { getByTestId } = render(
         <ThemeProvider>
-          <AuthProvider>
+          
             <RealTimeProvider>
               <EarnCoinsScreen />
             </RealTimeProvider>
-          </AuthProvider>
+          
         </ThemeProvider>
       );
 
@@ -603,11 +603,11 @@ describe('Mobile App UI Workflows', () => {
     it('should handle navigation between screens', () => {
       const { getByText, getByTestId } = render(
         <ThemeProvider>
-          <AuthProvider>
+          
             <RealTimeProvider>
               <TransactionHistoryScreen />
             </RealTimeProvider>
-          </AuthProvider>
+          
         </ThemeProvider>
       );
 
@@ -619,11 +619,11 @@ describe('Mobile App UI Workflows', () => {
     it('should maintain state during navigation', () => {
       const { getByText } = render(
         <ThemeProvider>
-          <AuthProvider>
+          
             <RealTimeProvider>
               <EarnCoinsScreen />
             </RealTimeProvider>
-          </AuthProvider>
+          
         </ThemeProvider>
       );
 

@@ -59,7 +59,7 @@ export class UserProfile {
 
   // Relations
   @OneToOne(() => User, (user) => user.profile)
-  @JoinColumn()
+  @JoinColumn({ name: 'userId' })
   user: User;
 
   @Column()
