@@ -12,7 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
-import { colors, spacing, typography, borderRadius } from '@/styles/theme';
+import { colors, spacing, typography, borderRadius, shadows, glassEffects } from '@/styles/theme';
 
 interface FileUploadProps {
   onFileSelect: (file: any) => void;
@@ -79,9 +79,8 @@ export default function FileUpload({
 
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [4, 3],
-        quality: 0.8,
+        allowsEditing: false, // No cropping, upload as-is
+        quality: 0.8, // Good quality for receipts
       });
       
       if (!result.canceled && result.assets[0]) {
@@ -184,16 +183,31 @@ export default function FileUpload({
     if (selectedFile.type === 'application/pdf') {
       return (
         <View style={styles.pdfPreview}>
-          <Ionicons name="document" size={48} color={colors.gray[400]} />
+          <View style={styles.pdfIconContainer}>
+            <Ionicons name="document" size={48} color={colors.gold[400]} />
+          </View>
           <Text style={styles.fileName} numberOfLines={1}>
             {selectedFile.name}
+          </Text>
+          <Text style={styles.fileSize}>
+            {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
           </Text>
         </View>
       );
     }
 
     return (
-      <Image source={{ uri: selectedFile.uri }} style={styles.imagePreview} />
+      <View style={styles.imagePreviewContainer}>
+        <Image source={{ uri: selectedFile.uri }} style={styles.imagePreview} />
+        <View style={styles.imageOverlay}>
+          <Text style={styles.fileName} numberOfLines={1}>
+            {selectedFile.name}
+          </Text>
+          <Text style={styles.fileSize}>
+            {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+          </Text>
+        </View>
+      </View>
     );
   };
 
@@ -232,11 +246,13 @@ export default function FileUpload({
           disabled={disabled}
           activeOpacity={0.8}
         >
-          <Ionicons 
-            name="cloud-upload-outline" 
-            size={32} 
-            color={disabled ? colors.gray[400] : colors.gold[500]} 
-          />
+          <View style={styles.uploadIconContainer}>
+            <Ionicons 
+              name="cloud-upload-outline" 
+              size={32} 
+              color={disabled ? colors.gray[400] : colors.gold[500]} 
+            />
+          </View>
           <Text style={[styles.uploadText, disabled && styles.uploadTextDisabled]}>
             {placeholder}
           </Text>
@@ -264,6 +280,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing[3],
   },
   uploadButton: {
+    ...glassEffects.card,
     borderWidth: 2,
     borderColor: colors.gold[300],
     borderStyle: 'dashed',
@@ -271,18 +288,28 @@ const styles = StyleSheet.create({
     padding: spacing[6],
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.background.light[50],
-    minHeight: 120,
+    minHeight: 140,
+    ...shadows.soft,
   },
   uploadButtonDisabled: {
     borderColor: colors.gray[300],
-    backgroundColor: colors.background.light[100],
+    backgroundColor: colors.background.input,
+  },
+  uploadIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.gold[100],
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing[3],
   },
   uploadText: {
     ...typography.bodyMedium,
     color: colors.text.primary,
     marginTop: spacing[3],
     textAlign: 'center',
+    fontWeight: '600',
   },
   uploadTextDisabled: {
     color: colors.text.secondary,
@@ -292,6 +319,7 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
     marginTop: spacing[2],
     textAlign: 'center',
+    lineHeight: 18,
   },
   uploadSubtextDisabled: {
     color: colors.gray[400],
@@ -300,28 +328,55 @@ const styles = StyleSheet.create({
     position: 'relative',
     borderRadius: borderRadius.lg,
     overflow: 'hidden',
-    backgroundColor: colors.background.light[50],
+    backgroundColor: colors.background.card,
     borderWidth: 1,
-    borderColor: colors.gray[200],
+    borderColor: colors.card.border,
+    ...shadows.card,
+  },
+  imagePreviewContainer: {
+    position: 'relative',
   },
   imagePreview: {
     width: '100%',
     height: 200,
     resizeMode: 'cover',
   },
+  imageOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    padding: spacing[3],
+  },
   pdfPreview: {
     width: '100%',
-    height: 120,
+    height: 140,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.background.light[100],
+    backgroundColor: colors.background.card,
+    padding: spacing[4],
+  },
+  pdfIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.gold[100],
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing[2],
   },
   fileName: {
     ...typography.bodySmall,
-    color: colors.text.secondary,
-    marginTop: spacing[2],
+    color: colors.text.primary,
     textAlign: 'center',
-    paddingHorizontal: spacing[4],
+    fontWeight: '500',
+  },
+  fileSize: {
+    ...typography.caption,
+    color: colors.text.secondary,
+    textAlign: 'center',
+    marginTop: spacing[1],
   },
   removeButton: {
     position: 'absolute',
@@ -345,7 +400,7 @@ const styles = StyleSheet.create({
   loadingContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 120,
+    minHeight: 140,
   },
   loadingText: {
     ...typography.bodyMedium,

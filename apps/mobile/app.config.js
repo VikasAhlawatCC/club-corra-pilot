@@ -18,8 +18,8 @@ const getBaseUrl = () => {
     return 'https://api.clubcorra.com';
   }
   
-  // Development - use environment variable or fallback to network IP
-  return getEnvVar('EXPO_PUBLIC_API_BASE_URL', 'http://192.168.1.4:3001');
+  // Development - use environment variable or fallback to localhost
+  return getEnvVar('EXPO_PUBLIC_API_BASE_URL', 'http://localhost:3001');
 };
 
 // Get WebSocket URL (should be the base server URL, not the API endpoint)
@@ -28,8 +28,8 @@ const getWsUrl = () => {
     return 'https://api.clubcorra.com';
   }
   
-  // Development - use environment variable or fallback to network IP
-  return getEnvVar('EXPO_PUBLIC_WS_URL', 'http://192.168.1.4:3001');
+  // Development - use environment variable or fallback to localhost
+  return getEnvVar('EXPO_PUBLIC_WS_URL', 'http://localhost:3001');
 };
 
 module.exports = {

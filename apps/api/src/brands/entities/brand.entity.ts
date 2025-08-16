@@ -30,19 +30,94 @@ export class Brand {
   @Column({ type: 'uuid', nullable: true })
   categoryId: string;
 
-  @Column({ type: 'decimal', precision: 5, scale: 2, default: 10 })
+  @Column({ 
+    type: 'decimal', 
+    precision: 5, 
+    scale: 2, 
+    default: 10,
+    transformer: {
+      to: (value: number) => value,
+      from: (value: string | number) => {
+        if (typeof value === 'string') {
+          const parsed = parseFloat(value);
+          return isNaN(parsed) ? 10 : parsed;
+        }
+        return value || 10;
+      }
+    }
+  })
   earningPercentage: number; // Percentage of MRP earned as coins (default: 10%)
 
-  @Column({ type: 'decimal', precision: 5, scale: 2, default: 30 })
+  @Column({ 
+    type: 'decimal', 
+    precision: 5, 
+    scale: 2, 
+    default: 30,
+    transformer: {
+      to: (value: number) => value,
+      from: (value: string | number) => {
+        if (typeof value === 'string') {
+          const parsed = parseFloat(value);
+          return isNaN(parsed) ? 30 : parsed;
+        }
+        return value || 30;
+      }
+    }
+  })
   redemptionPercentage: number; // Percentage of MRP that can be redeemed (default: 30%)
 
-  @Column({ type: 'decimal', precision: 10, scale: 2, default: 1 })
+  @Column({ 
+    type: 'decimal', 
+    precision: 10, 
+    scale: 2, 
+    default: 1,
+    transformer: {
+      to: (value: number) => value,
+      from: (value: string | number) => {
+        if (typeof value === 'string') {
+          const parsed = parseFloat(value);
+          return isNaN(parsed) ? 1 : parsed;
+        }
+        return value || 1;
+      }
+    }
+  })
   minRedemptionAmount: number; // Minimum amount required for redemption (default: 1)
 
-  @Column({ type: 'decimal', precision: 10, scale: 2, default: 2000 })
+  @Column({ 
+    type: 'decimal', 
+    precision: 10, 
+    scale: 2, 
+    default: 2000,
+    transformer: {
+      to: (value: number) => value,
+      from: (value: string | number) => {
+        if (typeof value === 'string') {
+          const parsed = parseFloat(value);
+          return isNaN(parsed) ? 2000 : parsed;
+        }
+        return value || 2000;
+      }
+    }
+  })
   maxRedemptionAmount: number; // Maximum amount that can be redeemed (default: 2000, same as brandwiseMaxCap)
 
-  @Column({ type: 'decimal', precision: 10, scale: 2, default: 2000 })
+  @Column({ 
+    type: 'decimal', 
+    precision: 10, 
+    scale: 2, 
+    default: 2000,
+    transformer: {
+      to: (value: number) => value,
+      from: (value: string | number) => {
+        if (typeof value === 'string') {
+          const parsed = parseFloat(value);
+          return isNaN(parsed) ? 2000 : parsed;
+        }
+        return value || 2000;
+      }
+    }
+  })
   brandwiseMaxCap: number; // Per-transaction maximum redemption limit (default: 2000, same as maxRedemptionAmount)
 
   @Column({ type: 'boolean', default: true })

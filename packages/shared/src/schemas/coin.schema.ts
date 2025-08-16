@@ -209,10 +209,46 @@ export const processPaymentResponseSchema = z.object({
 
 // Balance schemas
 export const balanceResponseSchema = z.object({
-  balance: z.number().min(0, 'Balance must be non-negative'),
-  totalEarned: z.number().min(0, 'Total earned must be non-negative'),
-  totalRedeemed: z.number().min(0, 'Total redeemed must be non-negative'),
-  lastUpdated: z.date(),
+  balance: z.union([
+    z.string().transform((val) => {
+      const parsed = parseFloat(val);
+      return isNaN(parsed) ? 0 : parsed;
+    }),
+    z.number().min(0, 'Balance must be non-negative')
+  ]).transform((val) => typeof val === 'number' ? val : parseFloat(val) || 0),
+  
+  totalEarned: z.union([
+    z.string().transform((val) => {
+      const parsed = parseFloat(val);
+      return isNaN(parsed) ? 0 : parsed;
+    }),
+    z.number().min(0, 'Total earned must be non-negative')
+  ]).transform((val) => typeof val === 'number' ? val : parseFloat(val) || 0),
+  
+  totalRedeemed: z.union([
+    z.string().transform((val) => {
+      const parsed = parseFloat(val);
+      return isNaN(parsed) ? 0 : parsed;
+    }),
+    z.number().min(0, 'Total redeemed must be non-negative')
+  ]).transform((val) => typeof val === 'number' ? val : parseFloat(val) || 0),
+  
+  lastUpdated: z.union([
+    z.string().transform((val) => new Date(val)),
+    z.date()
+  ]),
+  
+  // Additional fields that the API returns
+  id: z.string().uuid('Invalid balance ID format').optional(),
+  userId: z.string().uuid('Invalid user ID format').optional(),
+  createdAt: z.union([
+    z.string().transform((val) => new Date(val)),
+    z.date()
+  ]).optional(),
+  updatedAt: z.union([
+    z.string().transform((val) => new Date(val)),
+    z.date()
+  ]).optional(),
 });
 
 // User balance summary schema with pending requests

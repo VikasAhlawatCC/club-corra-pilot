@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { 
   MagnifyingGlassIcon, 
   FunnelIcon,
@@ -12,89 +13,163 @@ import {
   XCircleIcon
 } from '@heroicons/react/24/outline'
 import { useToast, ToastContainer } from '@/components/common'
+import { useAuth } from '@/contexts/AuthContext'
+import { userApi } from '@/lib/api'
 
 interface User {
   id: string
-  email: string
-  firstName: string
-  lastName: string
+  email: string | null
+  mobileNumber: string
+  firstName?: string
+  lastName?: string
   phoneNumber?: string
   isActive: boolean
   totalCoins: number
   joinDate: Date
-  lastActive: Date
+  lastActive?: Date
   totalTransactions: number
   pendingTransactions: number
+  status: string
+  profile?: {
+    firstName?: string
+    lastName?: string
+  } | null
+  coinBalance?: {
+    balance: string
+    totalEarned: string
+    totalRedeemed: string
+  } | null
+  createdAt: string
+  lastLoginAt?: string | null
+}
+
+interface UserStats {
+  totalUsers: number
+  activeUsers: number
+  pendingUsers: number
+  totalCoins: number
 }
 
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([])
   const [filteredUsers, setFilteredUsers] = useState<User[]>([])
+  const [userStats, setUserStats] = useState<UserStats>({
+    totalUsers: 0,
+    activeUsers: 0,
+    pendingUsers: 0,
+    totalCoins: 0
+  })
   const [isLoading, setIsLoading] = useState(true)
+  const [hasError, setHasError] = useState(false)
+  const [errorMessage, setErrorMessage] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
-  const [sortField, setSortField] = useState<keyof User>('joinDate')
+  const [sortField, setSortField] = useState<keyof User>('createdAt')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
   const { toasts, removeToast, showSuccess, showError } = useToast()
+  const router = useRouter()
+  const { user, isLoading: authLoading } = useAuth()
 
-  // Mock data for demonstration
-  useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        // TODO: Replace with actual API call
-        const mockUsers: User[] = [
-          {
-            id: '550e8400-e29b-41d4-a716-446655440001',
-            email: 'john.doe@example.com',
-            firstName: 'John',
-            lastName: 'Doe',
-            phoneNumber: '+91 98765 43210',
-            isActive: true,
-            totalCoins: 1250,
-            joinDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 30 days ago
-            lastActive: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
-            totalTransactions: 15,
-            pendingTransactions: 2
-          },
-          {
-            id: '550e8400-e29b-41d4-a716-446655440002',
-            email: 'jane.smith@example.com',
-            firstName: 'Jane',
-            lastName: 'Smith',
-            phoneNumber: '+91 98765 43211',
-            isActive: true,
-            totalCoins: 890,
-            joinDate: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000), // 45 days ago
-            lastActive: new Date(Date.now() - 24 * 60 * 60 * 1000), // 1 day ago
-            totalTransactions: 12,
-            pendingTransactions: 1
-          },
-          {
-            id: '550e8400-e29b-41d4-a716-446655440003',
-            email: 'bob.johnson@example.com',
-            firstName: 'Bob',
-            lastName: 'Johnson',
-            phoneNumber: '+91 98765 43212',
-            isActive: false,
-            totalCoins: 0,
-            joinDate: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000), // 60 days ago
-            lastActive: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // 7 days ago
-            totalTransactions: 8,
-            pendingTransactions: 0
-          }
-        ]
-        setUsers(mockUsers)
-        setFilteredUsers(mockUsers)
-      } catch (error) {
-        console.error('Failed to fetch users:', error)
-        showError('Failed to fetch users', 'Please try again later.')
-      } finally {
-        setIsLoading(false)
+  // Show loading while checking authentication
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+      </div>
+    )
+  }
+
+  // Redirect if not authenticated
+  if (!user) {
+    router.push('/login')
+    return null
+  }
+
+  // Fetch users data - using useCallback like transactions page
+  const fetchUsers = useCallback(async () => {
+    try {
+      setIsLoading(true)
+      setHasError(false)
+      setErrorMessage('')
+      
+      console.log('Fetching users from API...')
+      console.log('API Base URL:', process.env.NEXT_PUBLIC_API_BASE_URL)
+      
+      const [usersResponse, statsResponse] = await Promise.all([
+        userApi.getAllUsers(),
+        userApi.getUserStats()
+      ])
+      
+      if (usersResponse.success && statsResponse.success) {
+        console.log('Users fetched successfully:', usersResponse.data.length, 'users')
+        // Transform the API response to match our User interface
+        const transformedUsers: User[] = usersResponse.data.map((user: any) => {
+          // Handle missing profile data gracefully
+          const firstName = user.profile?.firstName || 'User';
+          const lastName = user.profile?.lastName || user.mobileNumber.slice(-4) || 'User';
+          const fullName = `${firstName} ${lastName}`.trim();
+          
+          return {
+            id: user.id,
+            email: user.email,
+            mobileNumber: user.mobileNumber,
+            firstName: firstName,
+            lastName: lastName,
+            phoneNumber: user.mobileNumber,
+            isActive: user.status === 'ACTIVE',
+            totalCoins: parseFloat(user.coinBalance?.balance || '0'),
+            joinDate: new Date(user.createdAt),
+            lastActive: user.lastLoginAt ? new Date(user.lastLoginAt) : undefined,
+            totalTransactions: 0, // TODO: Get from transaction service
+            pendingTransactions: 0, // TODO: Get from transaction service
+            status: user.status,
+            profile: user.profile,
+            coinBalance: user.coinBalance,
+            createdAt: user.createdAt,
+            lastLoginAt: user.lastLoginAt
+          };
+        })
+        
+        setUsers(transformedUsers)
+        setFilteredUsers(transformedUsers)
+        setUserStats(statsResponse.data)
+      } else {
+        throw new Error('Failed to fetch data from API')
       }
+    } catch (error) {
+      console.error('Failed to fetch users:', error)
+      console.error('Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
+      })
+      setHasError(true)
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to fetch users')
+      
+      // Fallback to empty data if API fails
+      setUsers([])
+      setFilteredUsers([])
+      setUserStats({
+        totalUsers: 0,
+        activeUsers: 0,
+        pendingUsers: 0,
+        totalCoins: 0
+      })
+    } finally {
+      setIsLoading(false)
     }
+  }, [])
 
+  // Fetch users on mount - same pattern as transactions page
+  useEffect(() => {
     fetchUsers()
-  }, [showError])
+  }, [fetchUsers])
+
+  // Retry function for failed requests
+  const handleRetry = useCallback(() => {
+    setHasError(false)
+    setErrorMessage('')
+    fetchUsers()
+  }, [fetchUsers])
 
   // Filter and sort users
   useEffect(() => {
@@ -102,17 +177,26 @@ export default function UsersPage() {
 
     if (searchTerm) {
       filtered = filtered.filter(user => 
-        user.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.phoneNumber?.includes(searchTerm)
+        user.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.mobileNumber.includes(searchTerm)
       )
     }
 
     if (statusFilter !== 'all') {
-      filtered = filtered.filter(user => 
-        statusFilter === 'active' ? user.isActive : !user.isActive
-      )
+      filtered = filtered.filter(user => {
+        switch (statusFilter) {
+          case 'active':
+            return user.status === 'ACTIVE'
+          case 'pending':
+            return user.status === 'PENDING'
+          case 'suspended':
+            return user.status === 'SUSPENDED'
+          default:
+            return true
+        }
+      })
     }
 
     // Sort users
@@ -120,10 +204,10 @@ export default function UsersPage() {
       const aValue = a[sortField]
       const bValue = b[sortField]
       
-      // Handle undefined values
-      if (aValue === undefined && bValue === undefined) return 0
-      if (aValue === undefined) return sortDirection === 'asc' ? -1 : 1
-      if (bValue === undefined) return sortDirection === 'asc' ? 1 : -1
+      // Handle undefined and null values
+      if ((aValue === undefined || aValue === null) && (bValue === undefined || bValue === null)) return 0
+      if (aValue === undefined || aValue === null) return sortDirection === 'asc' ? -1 : 1
+      if (bValue === undefined || bValue === null) return sortDirection === 'asc' ? 1 : -1
       
       if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1
       if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1
@@ -148,13 +232,13 @@ export default function UsersPage() {
       setUsers(prev => 
         prev.map(user => 
           user.id === userId 
-            ? { ...user, isActive: !user.isActive }
+            ? { ...user, status: user.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE' }
             : user
         )
       )
       
       const user = users.find(u => u.id === userId)
-      const newStatus = user?.isActive ? 'deactivated' : 'activated'
+      const newStatus = user?.status === 'ACTIVE' ? 'suspended' : 'activated'
       showSuccess('User Status Updated', `User has been ${newStatus} successfully`)
     } catch (error) {
       console.error('Failed to update user status:', error)
@@ -188,6 +272,41 @@ export default function UsersPage() {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+      </div>
+    )
+  }
+
+  if (hasError) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">User Management</h1>
+          <p className="mt-2 text-gray-600">
+            Manage user accounts, monitor activity, and view transaction history.
+          </p>
+        </div>
+        
+        <div className="bg-white p-8 rounded-lg shadow text-center">
+          <div className="text-red-600 mb-4">
+            <svg className="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+          </div>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Failed to Load Users</h3>
+          <p className="text-gray-600 mb-6">{errorMessage}</p>
+          <div className="space-y-3">
+            <button
+              onClick={handleRetry}
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            >
+              Try Again
+            </button>
+            <div className="text-sm text-gray-500">
+              <p>Make sure the API server is running and accessible.</p>
+              <p>Check your network connection and API configuration.</p>
+            </div>
+          </div>
+        </div>
       </div>
     )
   }
@@ -233,7 +352,8 @@ export default function UsersPage() {
             >
               <option value="all">All Users</option>
               <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
+              <option value="pending">Pending</option>
+              <option value="suspended">Suspended</option>
             </select>
           </div>
           
@@ -269,7 +389,7 @@ export default function UsersPage() {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-500">Total Users</p>
-              <p className="text-2xl font-semibold text-gray-900">{users.length}</p>
+              <p className="text-2xl font-semibold text-gray-900">{userStats.totalUsers}</p>
             </div>
           </div>
         </div>
@@ -282,7 +402,7 @@ export default function UsersPage() {
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-500">Active Users</p>
               <p className="text-2xl font-semibold text-gray-900">
-                {users.filter(u => u.isActive).length}
+                {userStats.activeUsers}
               </p>
             </div>
           </div>
@@ -298,7 +418,7 @@ export default function UsersPage() {
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-500">Total Coins</p>
               <p className="text-2xl font-semibold text-gray-900">
-                {users.reduce((sum, user) => sum + user.totalCoins, 0).toLocaleString()}
+                {userStats.totalCoins.toLocaleString()}
               </p>
             </div>
           </div>
@@ -312,9 +432,9 @@ export default function UsersPage() {
               </svg>
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-500">Pending Transactions</p>
+              <p className="text-sm font-medium text-gray-500">Pending Users</p>
               <p className="text-2xl font-semibold text-gray-900">
-                {users.reduce((sum, user) => sum + user.pendingTransactions, 0)}
+                {userStats.pendingUsers}
               </p>
             </div>
           </div>
@@ -397,12 +517,12 @@ export default function UsersPage() {
                     <div className="flex items-center">
                       <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center">
                         <span className="text-sm font-medium text-indigo-600">
-                          {user.firstName[0]}{user.lastName[0]}
+                          {user.firstName?.[0] || 'U'}{user.lastName?.[0] || 'U'}
                         </span>
                       </div>
                       <div className="ml-4">
                         <div className="text-sm font-medium text-gray-900">
-                          {user.firstName} {user.lastName}
+                          {user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : 'User'}
                         </div>
                         <div className="text-sm text-gray-500">
                           ID: {user.id.slice(0, 8)}...
@@ -411,7 +531,7 @@ export default function UsersPage() {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{user.email}</div>
+                    <div className="text-sm text-gray-900">{user.email || user.mobileNumber}</div>
                     {user.phoneNumber && (
                       <div className="text-sm text-gray-500">{user.phoneNumber}</div>
                     )}
@@ -428,15 +548,22 @@ export default function UsersPage() {
                     {formatDate(user.joinDate)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {formatTimeAgo(user.lastActive)}
+                    {user.lastActive ? formatTimeAgo(user.lastActive) : 'N/A'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      user.isActive 
-                        ? 'text-green-800 bg-green-100' 
-                        : 'text-red-800 bg-red-100'
+                      user.status === 'ACTIVE' 
+                        ? 'text-green-800 bg-green-100'
+                        : user.status === 'PENDING'
+                        ? 'text-yellow-800 bg-yellow-100'
+                        : user.status === 'SUSPENDED'
+                        ? 'text-red-800 bg-red-100'
+                        : 'text-gray-800 bg-gray-100'
                     }`}>
-                      {user.isActive ? 'Active' : 'Inactive'}
+                      {user.status === 'ACTIVE' ? 'Active' : 
+                       user.status === 'PENDING' ? 'Pending' : 
+                       user.status === 'SUSPENDED' ? 'Suspended' : 
+                       user.status}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -458,13 +585,13 @@ export default function UsersPage() {
                       <button
                         onClick={() => handleToggleUserStatus(user.id)}
                         className={`p-1 rounded hover:bg-gray-50 ${
-                          user.isActive 
+                          user.status === 'ACTIVE' 
                             ? 'text-red-600 hover:text-red-900' 
                             : 'text-green-600 hover:text-green-900'
                         }`}
-                        title={user.isActive ? 'Deactivate User' : 'Activate User'}
+                        title={user.status === 'ACTIVE' ? 'Suspend User' : 'Activate User'}
                       >
-                        {user.isActive ? <XCircleIcon className="w-4 h-4" /> : <CheckCircleIcon className="w-4 h-4" />}
+                        {user.status === 'ACTIVE' ? <XCircleIcon className="w-4 h-4" /> : <CheckCircleIcon className="w-4 h-4" />}
                       </button>
                     </div>
                   </td>

@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { User, AuthToken, AuthProvider } from '@shared/types';
 import { authService } from '@/services/auth.service';
 import { otpService } from '@/services/otp.service';
+import { apiService } from '@/services/api.service';
 import { AUTH_ERROR_MESSAGES, getErrorMessage } from '@/constants/error-messages';
 
 interface AuthState {
@@ -178,26 +179,23 @@ export const useAuthStore = create<AuthState>()(
           
           // Check if user is fully verified and tokens are provided
           if ('accessToken' in response && 'refreshToken' in response && 'user' in response) {
-            // User is fully verified, store tokens and complete registration
-            try {
-              await authService.storeTokens({
-                accessToken: response.accessToken as string,
-                refreshToken: response.refreshToken as string,
-                expiresIn: (response as any).expiresIn as number,
-                tokenType: 'Bearer'
-              });
-              
-              // Update states on successful verification with tokens
-              set({ 
-                user: response.user as User, 
-                tokens: {
-                  accessToken: response.accessToken as string,
-                  refreshToken: response.refreshToken as string,
-                  expiresIn: (response as any).expiresIn as number,
-                  tokenType: 'Bearer'
-                },
-                isAuthenticated: true 
-              });
+            // User is fully verified, complete registration (Zustand will persist tokens)
+            const tokens = {
+              accessToken: response.accessToken as string,
+              refreshToken: response.refreshToken as string,
+              expiresIn: (response as any).expiresIn as number,
+              tokenType: 'Bearer' as const
+            };
+            
+            // Update API service tokens
+            await apiService.updateTokens(tokens.accessToken, tokens.refreshToken);
+            
+            // Update states on successful verification with tokens
+            set({ 
+              user: response.user as User, 
+              tokens,
+              isAuthenticated: true 
+            });
               
               // Update registration state
               set((state) => ({
@@ -208,11 +206,7 @@ export const useAuthStore = create<AuthState>()(
                   emailVerified: true,
                 }
               }));
-            } catch (error) {
-              console.error('Failed to store tokens:', error);
-              throw new Error('Failed to store authentication tokens');
-            }
-          } else if ('message' in response && 'requiresAdditionalVerification' in response) {
+            } else if ('message' in response && 'requiresAdditionalVerification' in response) {
             // User is not fully verified yet, update registration state
             // In the new flow, we go to password setup instead of email verification
             
@@ -339,10 +333,10 @@ export const useAuthStore = create<AuthState>()(
           console.log('Auth store: Received response:', response);
           console.log('Auth store: Response tokens:', response.tokens);
           
-          // Store tokens securely
-          console.log('Auth store: Attempting to store tokens...');
-          await authService.storeTokens(response.tokens);
-          console.log('Auth store: Tokens stored successfully');
+          // Update API service tokens (Zustand will persist tokens automatically)
+          console.log('Auth store: Updating API service tokens...');
+          await apiService.updateTokens(response.tokens.accessToken, response.tokens.refreshToken);
+          console.log('Auth store: API service tokens updated');
           
           set({ 
             user: response.user, 
@@ -378,10 +372,10 @@ export const useAuthStore = create<AuthState>()(
           console.log('Auth store: Received response:', response);
           console.log('Auth store: Response tokens:', response.tokens);
           
-          // Store tokens securely
-          console.log('Auth store: Attempting to store tokens...');
-          await authService.storeTokens(response.tokens);
-          console.log('Auth store: Tokens stored successfully');
+          // Update API service tokens (Zustand will persist tokens automatically)
+          console.log('Auth store: Updating API service tokens...');
+          await apiService.updateTokens(response.tokens.accessToken, response.tokens.refreshToken);
+          console.log('Auth store: API service tokens updated');
           
           set({ 
             user: response.user, 
@@ -398,12 +392,14 @@ export const useAuthStore = create<AuthState>()(
           if (error instanceof Error) {
             if (error.message.includes('Network request failed')) {
               throw new Error('Unable to connect to server. Please check your internet connection and ensure you\'re on the same network as the server.');
-            } else if (error.message.includes('Authentication failed')) {
-              throw new Error('Invalid mobile number or password. Please check your credentials and try again.');
-            } else if (error.message.includes('User not found')) {
+            } else if (error.message.includes('Mobile number not registered')) {
               throw new Error('No account found with this mobile number. Please sign up first.');
-            } else if (error.message.includes('Invalid password')) {
-              throw new Error('Incorrect password. Please try again or use OTP login.');
+            } else if (error.message.includes('Incorrect password')) {
+              throw new Error('Incorrect password. Please check your password and try again.');
+            } else if (error.message.includes('Password not set')) {
+              throw new Error('This account doesn\'t have a password set. Please use OTP login instead.');
+            } else if (error.message.includes('User account is not active')) {
+              throw new Error('Your account is not active. Please contact support for assistance.');
             } else if (error.message.includes('Connection refused')) {
               throw new Error('Server is not accessible. Please check if the server is running and try again.');
             } else if (error.message.includes('Server is not accessible')) {
@@ -640,8 +636,14 @@ export const useAuthStore = create<AuthState>()(
           console.error('Email login failed:', error);
           // Provide specific error messages for email login failures
           if (error instanceof Error) {
-            if (error.message.includes('Invalid credentials')) {
-              throw new Error('Invalid email or password. Please try again.');
+            if (error.message.includes('Email address not registered')) {
+              throw new Error('No account found with this email address. Please sign up first.');
+            } else if (error.message.includes('Incorrect password')) {
+              throw new Error('Incorrect password. Please check your password and try again.');
+            } else if (error.message.includes('Password not set')) {
+              throw new Error('This account doesn\'t have a password set. Please use OTP login instead.');
+            } else if (error.message.includes('User account is not active')) {
+              throw new Error('Your account is not active. Please contact support for assistance.');
             } else if (error.message.includes('Account locked')) {
               throw new Error('Account is temporarily locked. Please try again later.');
             } else {
@@ -757,6 +759,13 @@ export const useAuthStore = create<AuthState>()(
                 expiresIn: (response as any).expiresIn as number,
                 tokenType: 'Bearer'
               });
+              
+              // Update API service tokens
+              await apiService.updateTokens(
+                response.accessToken as string, 
+                response.refreshToken as string
+              );
+              
               set({ 
                 user: response.user as User, 
                 tokens: {
@@ -848,6 +857,12 @@ export const useAuthStore = create<AuthState>()(
               expiresIn: response.expiresIn || 3600,
               tokenType: 'Bearer',
             });
+            
+            // Update API service tokens
+            await apiService.updateTokens(
+              response.accessToken,
+              response.refreshToken
+            );
             
             set({ 
               user: response.user || get().user,
@@ -951,67 +966,99 @@ export const useAuthStore = create<AuthState>()(
 
       initializeAuth: async () => {
         try {
-          // Check if we have stored tokens
-          const storedTokens = await authService.getStoredTokens();
+          console.log('Initializing auth...');
           
-          if (storedTokens) {
-            // Verify tokens are still valid
-            const isValid = !(await authService.isTokenExpired());
+          // Get the current state from the store (which includes persisted data)
+          const currentState = get();
+          console.log('Current auth state:', {
+            user: !!currentState.user,
+            tokens: !!currentState.tokens,
+            isAuthenticated: currentState.isAuthenticated
+          });
+          
+          // If we already have valid tokens and user, just ensure API service is updated
+          if (currentState.tokens?.accessToken && currentState.user) {
+            console.log('Found existing valid tokens, updating API service...');
             
-            if (isValid) {
-              // Try to refresh tokens to get latest user data
-              try {
-                const newTokens = await authService.refreshToken(storedTokens.refreshToken);
-                await authService.storeTokens(newTokens.tokens);
+            // Update API service tokens
+            await apiService.updateTokens(
+              currentState.tokens.accessToken,
+              currentState.tokens.refreshToken
+            );
+            
+            // Update session state
+            const now = Date.now();
+            set({
+              isAuthenticated: true,
+              sessionState: {
+                lastActivity: now,
+                isSessionValid: true,
+                autoRefreshEnabled: true,
+                refreshTokenExpiry: null,
+              }
+            });
+            
+            console.log('Auth initialized successfully with existing tokens');
+            return;
+          }
+          
+          // If no existing tokens, try to load from storage manually
+          console.log('No existing tokens, checking AsyncStorage...');
+          const authStorageData = await AsyncStorage.getItem('auth-storage');
+          
+          if (authStorageData) {
+            try {
+              const parsed = JSON.parse(authStorageData);
+              console.log('Found auth-storage data:', parsed);
+              
+              if (parsed.state && parsed.state.tokens && parsed.state.user) {
+                console.log('Loading tokens and user from storage...');
                 
-                // Update session state
+                // Update API service tokens
+                await apiService.updateTokens(
+                  parsed.state.tokens.accessToken,
+                  parsed.state.tokens.refreshToken
+                );
+                
+                // Update store state
                 const now = Date.now();
                 set({
-                  tokens: newTokens.tokens,
-                  user: newTokens.user,
+                  tokens: parsed.state.tokens,
+                  user: parsed.state.user,
                   isAuthenticated: true,
                   sessionState: {
                     lastActivity: now,
                     isSessionValid: true,
                     autoRefreshEnabled: true,
-                    refreshTokenExpiry: null, // We'll calculate this from expiresIn if needed
-                  }
-                });
-              } catch (error) {
-                console.warn('Failed to refresh tokens, clearing auth state:', error);
-                await authService.clearStoredTokens();
-                set({
-                  user: null,
-                  tokens: null,
-                  isAuthenticated: false,
-                  sessionState: {
-                    lastActivity: 0,
-                    isSessionValid: false,
-                    autoRefreshEnabled: false,
                     refreshTokenExpiry: null,
                   }
                 });
+                
+                console.log('Auth initialized successfully from storage');
+                return;
               }
-            } else {
-              // Tokens are expired, clear them
-              await authService.clearStoredTokens();
-              set({
-                user: null,
-                tokens: null,
-                isAuthenticated: false,
-                sessionState: {
-                  lastActivity: 0,
-                  isSessionValid: false,
-                  autoRefreshEnabled: false,
-                  refreshTokenExpiry: null,
-                }
-              });
+            } catch (parseError) {
+              console.warn('Failed to parse auth-storage:', parseError);
             }
           }
+          
+          // No valid tokens found, user needs to login
+          console.log('No valid tokens found, user needs to login');
+          set({
+            user: null,
+            tokens: null,
+            isAuthenticated: false,
+            sessionState: {
+              lastActivity: 0,
+              isSessionValid: false,
+              autoRefreshEnabled: false,
+              refreshTokenExpiry: null,
+            }
+          });
+          
         } catch (error) {
           console.error('Failed to initialize auth:', error);
           // Clear any invalid state
-          await authService.clearStoredTokens();
           set({
             user: null,
             tokens: null,
@@ -1031,6 +1078,12 @@ export const useAuthStore = create<AuthState>()(
           const newTokens = await authService.autoRefreshTokens();
           
           if (newTokens) {
+            // Update API service tokens
+            await apiService.updateTokens(
+              newTokens.accessToken,
+              newTokens.refreshToken
+            );
+            
             // Update session state
             const now = Date.now();
             set({ 
@@ -1228,6 +1281,9 @@ export const useAuthStore = create<AuthState>()(
       logout: async () => {
         // Clear stored tokens
         await authService.clearStoredTokens();
+        
+        // Clear API service tokens
+        await apiService.clearTokens();
         
         set({
           user: null,

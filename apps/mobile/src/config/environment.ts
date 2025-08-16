@@ -1,4 +1,5 @@
 import Constants from 'expo-constants';
+import { getCurrentConfig } from './server-config';
 
 // Environment configuration for the mobile app
 
@@ -11,16 +12,20 @@ console.log('API Base URL from Constants:', Constants.expoConfig?.extra?.apiBase
 console.log('WS URL from Constants:', Constants.expoConfig?.extra?.wsUrl);
 console.log('========================');
 
+// Get current server configuration
+const currentServerConfig = getCurrentConfig();
+console.log('Current server config:', currentServerConfig);
+
 // Ensure base URLs include Nest global prefix `/api/v1`
-// Use the configuration from app.config.js
+// Use the configuration from server-config.ts for development
 const normalizeApiBase = (base?: string) => {
-  const raw = base || 'http://192.168.1.4:3001';
+  const raw = base || currentServerConfig.apiBaseUrl;
   return raw.endsWith('/api/v1') ? raw : `${raw.replace(/\/$/, '')}/api/v1`;
 };
 
 // For WebSocket connections, use the base server URL (not the API endpoint)
 const normalizeWsUrl = (base?: string) => {
-  const raw = base || 'http://192.168.1.4:3001';
+  const raw = base || currentServerConfig.wsUrl;
   // Remove /api/v1 if present, as WebSocket connects to base server
   return raw.replace('/api/v1', '').replace(/\/$/, '');
 };

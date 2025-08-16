@@ -1,7 +1,9 @@
 import { requestOtpSchema, verifyOtpSchema, otpResponseSchema } from '@shared/schemas';
 
 // Include Nest global prefix `/api/v1`
-const RAW_API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.4:3001';
+import { environment } from '../config/environment';
+
+const RAW_API_BASE_URL = environment.apiBaseUrl;
 const API_BASE_URL = RAW_API_BASE_URL.endsWith('/api/v1')
   ? RAW_API_BASE_URL
   : `${RAW_API_BASE_URL.replace(/\/$/, '')}/api/v1`;

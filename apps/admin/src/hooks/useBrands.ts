@@ -21,6 +21,7 @@ export function useBrands() {
   const fetchBrands = useCallback(async (params: BrandSearchParams) => {
     try {
       setIsLoading(true)
+      
       const response = await brandApi.getAllBrands(
         params.page,
         params.pageSize,
@@ -28,16 +29,31 @@ export function useBrands() {
         params.categoryId,
         params.isActive
       )
-      setBrands(response.data)
-      setTotalPages(response.totalPages)
-      setTotalBrands(response.total)
+      
+      // Add safety checks for the response structure
+      if (response && typeof response === 'object') {
+        // The API returns { brands: [...], total: ..., page: ..., limit: ..., totalPages: ... }
+        setBrands(response.brands || [])
+        setTotalPages(response.totalPages || 1)
+        setTotalBrands(response.total || 0)
+      } else {
+        console.error('Invalid response structure:', response)
+        setBrands([])
+        setTotalPages(1)
+        setTotalBrands(0)
+        showError('Invalid response from server')
+      }
     } catch (error) {
       console.error('Failed to fetch brands:', error)
       showError('Failed to fetch brands')
+      // Set default values on error
+      setBrands([])
+      setTotalPages(1)
+      setTotalBrands(0)
     } finally {
       setIsLoading(false)
     }
-  }, []) // Remove showError dependency to prevent infinite loops
+  }, [showError]) // Re-add showError dependency since we're using it in the error handling
 
   const deleteBrand = useCallback(async (brandId: string) => {
     try {

@@ -132,7 +132,7 @@ export default function AuthChoiceScreen() {
                 </View>
                 
                 <Button
-                  title="Sign In"
+                  title="Login"
                   onPress={handleLogin}
                   variant="primary"
                   size="large"

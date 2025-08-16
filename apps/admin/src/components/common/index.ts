@@ -1,5 +1,6 @@
 export { ErrorBoundary } from './ErrorBoundary'
 export { LoadingSpinner, LoadingSpinnerInline } from './LoadingSpinner'
+export { ErrorAlert } from './ErrorAlert'
 export { default as Toast, ToastContainer, useToast } from './Toast'
 export type { ToastType } from './Toast'
 export { Skeleton, SkeletonText, SkeletonCard, SkeletonTable } from './Skeleton'

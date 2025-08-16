@@ -18,7 +18,7 @@ async function addAdminToNewTable() {
     await dataSource.initialize();
     console.log('✅ Database connected successfully');
 
-    const adminEmail = 'v.ahlawat@clubcorra.com';
+    const adminEmail = 'admin@clubcorra.com';
     const adminPassword = 'admin123';
 
     // Check if admins table exists

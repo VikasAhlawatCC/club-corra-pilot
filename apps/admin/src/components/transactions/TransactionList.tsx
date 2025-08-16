@@ -79,7 +79,7 @@ export function TransactionList({
       {/* Stable Modal Container - Prevents DOM manipulation errors */}
       <div className="modal-container">
         {/* Transaction Verification Modal for Pending Transactions */}
-        {selectedTransaction && selectedTransaction.status === 'PENDING' && (
+        {selectedTransaction && selectedTransaction.status === 'PENDING' && showVerificationModal && (
           <div key={`verification-container-${selectedTransaction.id}`}>
             <TransactionVerificationModal
               key={`verification-${selectedTransaction.id}`}
@@ -110,7 +110,7 @@ export function TransactionList({
         )}
 
         {/* Transaction Detail Modal for Completed Transactions */}
-        {selectedTransaction && selectedTransaction.status !== 'PENDING' && (
+        {selectedTransaction && selectedTransaction.status !== 'PENDING' && showDetailModal && (
           <div key={`detail-container-${selectedTransaction.id}`}>
             <TransactionDetailModal
               key={`detail-${selectedTransaction.id}`}

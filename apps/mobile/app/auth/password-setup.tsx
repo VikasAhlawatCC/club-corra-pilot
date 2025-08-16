@@ -8,10 +8,12 @@ import { Button, Card, LoadingSpinner } from '@/components/common';
 import { colors, spacing, borderRadius, typography, shadows, glassEffects, animation } from '@/styles/theme';
 import { environment } from '@/config/environment';
 import { useAuthStore } from '@/stores/auth.store';
+import { useWelcomeBonus } from '@/hooks/useWelcomeBonus';
 
 export default function NewPasswordSetupScreen() {
   const params = useLocalSearchParams();
   const { mobileNumber, userId } = params;
+  const { setWelcomeBonusFromPasswordSetup } = useWelcomeBonus();
   
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -90,6 +92,9 @@ export default function NewPasswordSetupScreen() {
       });
 
       setIsLoading(false);
+      
+      // Set welcome bonus flag for this user (they came from password setup flow)
+      await setWelcomeBonusFromPasswordSetup();
       
       // Navigate to email verification or main app
       if (data.requiresEmailVerification) {

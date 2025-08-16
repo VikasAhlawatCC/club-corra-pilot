@@ -1,50 +1,43 @@
-import React, { createContext, useContext, useState } from 'react';
-
-interface User {
-  id: string;
-  phoneNumber: string;
-  firstName: string;
-  lastName: string;
-  coins: number;
-}
+import React, { createContext, useContext, useEffect } from 'react';
+import { useAuthStore } from '../stores/auth.store';
 
 interface AuthContextType {
-  user: User | null;
-  isAuthenticated: boolean;
-  login: (userData: User) => void;
-  logout: () => void;
-  updateUser: (userData: Partial<User>) => void;
+  isInitialized: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+interface AuthProviderProps {
+  children: React.ReactNode;
+}
 
-  const login = (userData: User) => {
-    setUser(userData);
-  };
+export function AuthProvider({ children }: AuthProviderProps) {
+  const { initializeAuth, isAuthenticated } = useAuthStore();
+  const [isInitialized, setIsInitialized] = React.useState(false);
 
-  const logout = () => {
-    setUser(null);
-  };
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        console.log('[AuthProvider] Initializing authentication...');
+        await initializeAuth();
+        console.log('[AuthProvider] Authentication initialized successfully');
+      } catch (error) {
+        console.error('[AuthProvider] Failed to initialize authentication:', error);
+      } finally {
+        setIsInitialized(true);
+      }
+    };
 
-  const updateUser = (userData: Partial<User>) => {
-    if (user) {
-      setUser({ ...user, ...userData });
-    }
-  };
+    initAuth();
+  }, [initializeAuth]);
 
-  const value = {
-    user,
-    isAuthenticated: !!user,
-    login,
-    logout,
-    updateUser,
-  };
+  // Show loading state while initializing
+  if (!isInitialized) {
+    return null; // Or a loading spinner
+  }
 
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider value={{ isInitialized }}>
       {children}
     </AuthContext.Provider>
   );
@@ -52,8 +45,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 export function useAuth() {
   const context = useContext(AuthContext);
-  if (!context) {
+  if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
-}
+} 

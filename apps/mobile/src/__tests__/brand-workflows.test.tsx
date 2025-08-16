@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
-import { AuthProvider } from '../providers/AuthProvider';
+// AuthProvider removed - using Zustand store directly
 import { RealTimeProvider } from '../providers/RealTimeProvider';
 import { ThemeProvider } from '../providers/ThemeProvider';
 

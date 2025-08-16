@@ -121,16 +121,16 @@ describe('Auth Service', () => {
     });
   });
 
-  describe('login', () => {
-    it('logs in successfully', async () => {
+  describe('loginWithMobilePassword', () => {
+    it('handles mobile password login successfully', async () => {
       const mockApiResponse = {
         user: { id: '1', mobileNumber: '+1234567890' },
-        tokens: { accessToken: 'token123', refreshToken: 'refresh123' },
+        tokens: { accessToken: 'token123', refreshToken: 'refresh123', expiresIn: 604800 },
       };
 
       const mockAdaptedResponse = {
         user: { id: '1', mobileNumber: '+1234567890' },
-        tokens: { accessToken: 'token123', refreshToken: 'refresh123' },
+        tokens: { accessToken: 'token123', refreshToken: 'refresh123', expiresIn: 604800 },
       };
 
       (global.fetch as jest.Mock).mockResolvedValueOnce({
@@ -140,16 +140,51 @@ describe('Auth Service', () => {
 
       (adaptApiAuthResponse as jest.Mock).mockReturnValue(mockAdaptedResponse);
 
-      const result = await authService.login('+1234567890', '123456');
+      const result = await authService.loginWithMobilePassword('+1234567890', 'password123');
 
       expect(result).toEqual(mockAdaptedResponse);
       expect(global.fetch).toHaveBeenCalledWith(
-        'http://localhost:3000/auth/login/mobile',
+        'http://192.168.1.4:3001/api/v1/auth/login/mobile-password',
         expect.objectContaining({
           method: 'POST',
           body: JSON.stringify({
             mobileNumber: '+1234567890',
-            otpCode: '123456',
+            password: 'password123',
+          }),
+        })
+      );
+    });
+  });
+
+  describe('loginWithEmail', () => {
+    it('handles email login successfully', async () => {
+      const mockApiResponse = {
+        user: { id: '1', email: 'test@example.com' },
+        tokens: { accessToken: 'token123', refreshToken: 'refresh123', expiresIn: 604800 },
+      };
+
+      const mockAdaptedResponse = {
+        user: { id: '1', email: 'test@example.com' },
+        tokens: { accessToken: 'token123', refreshToken: 'refresh123', expiresIn: 604800 },
+      };
+
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockApiResponse,
+      });
+
+      (adaptApiAuthResponse as jest.Mock).mockReturnValue(mockAdaptedResponse);
+
+      const result = await authService.loginWithEmail('test@example.com', 'password123');
+
+      expect(result).toEqual(mockAdaptedResponse);
+      expect(global.fetch).toHaveBeenCalledWith(
+        'http://192.168.1.4:3001/api/v1/auth/login/email',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({
+            email: 'test@example.com',
+            password: 'password123',
           }),
         })
       );
@@ -172,7 +207,7 @@ describe('Auth Service', () => {
 
       expect(result).toEqual(mockResponse);
       expect(global.fetch).toHaveBeenCalledWith(
-        'http://localhost:3000/auth/otp/send',
+        'http://192.168.1.4:3001/api/v1/auth/request-otp',
         expect.objectContaining({
           method: 'POST',
           body: JSON.stringify({
@@ -188,12 +223,12 @@ describe('Auth Service', () => {
     it('handles OAuth signup successfully', async () => {
       const mockApiResponse = {
         user: { id: '1', mobileNumber: '+1234567890' },
-        tokens: { accessToken: 'token123', refreshToken: 'refresh123' },
+        tokens: { accessToken: 'token123', refreshToken: 'refresh123', expiresIn: 604800 },
       };
 
       const mockAdaptedResponse = {
         user: { id: '1', mobileNumber: '+1234567890' },
-        tokens: { accessToken: 'token123', refreshToken: 'refresh123' },
+        tokens: { accessToken: 'token123', refreshToken: 'refresh123', expiresIn: 604800 },
       };
 
       (global.fetch as jest.Mock).mockResolvedValueOnce({
@@ -207,12 +242,13 @@ describe('Auth Service', () => {
 
       expect(result).toEqual(mockAdaptedResponse);
       expect(global.fetch).toHaveBeenCalledWith(
-        'http://localhost:3000/auth/oauth',
+        'http://192.168.1.4:3001/api/v1/auth/oauth/signup',
         expect.objectContaining({
           method: 'POST',
           body: JSON.stringify({
             provider: 'GOOGLE',
-            accessToken: 'auth_code_123',
+            code: 'auth_code_123',
+            redirectUri: 'https://example.com/callback',
           }),
         })
       );
@@ -223,12 +259,12 @@ describe('Auth Service', () => {
     it('refreshes token successfully', async () => {
       const mockApiResponse = {
         user: { id: '1', mobileNumber: '+1234567890' },
-        tokens: { accessToken: 'newToken123', refreshToken: 'newRefresh123' },
+        tokens: { accessToken: 'newToken123', refreshToken: 'newRefresh123', expiresIn: 604800 },
       };
 
       const mockAdaptedResponse = {
         user: { id: '1', mobileNumber: '+1234567890' },
-        tokens: { accessToken: 'newToken123', refreshToken: 'newRefresh123' },
+        tokens: { accessToken: 'newToken123', refreshToken: 'newRefresh123', expiresIn: 604800 },
       };
 
       (global.fetch as jest.Mock).mockResolvedValueOnce({
@@ -242,7 +278,7 @@ describe('Auth Service', () => {
 
       expect(result).toEqual(mockAdaptedResponse);
       expect(global.fetch).toHaveBeenCalledWith(
-        'http://localhost:3000/auth/refresh',
+        'http://192.168.1.4:3001/api/v1/auth/refresh-token',
         expect.objectContaining({
           method: 'POST',
           headers: {

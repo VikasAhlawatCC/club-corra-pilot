@@ -1,7 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // API Configuration - include Nest global prefix `/api/v1`
-const RAW_API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.4:3001';
+import { environment } from '../config/environment';
+
+const RAW_API_BASE_URL = environment.apiBaseUrl;
 const API_BASE_URL = RAW_API_BASE_URL.endsWith('/api/v1')
   ? RAW_API_BASE_URL
   : `${RAW_API_BASE_URL.replace(/\/$/, '')}/api/v1`;
@@ -46,8 +48,30 @@ export class ApiService {
   // Load tokens from storage
   private async loadTokens() {
     try {
-      this.accessToken = await AsyncStorage.getItem('accessToken');
-      this.refreshToken = await AsyncStorage.getItem('refreshToken');
+      // Try to load from the Zustand store storage key first
+      const authStorageData = await AsyncStorage.getItem('auth-storage');
+      if (authStorageData) {
+        try {
+          const parsed = JSON.parse(authStorageData);
+          if (parsed.state && parsed.state.tokens) {
+            this.accessToken = parsed.state.tokens.accessToken || null;
+            this.refreshToken = parsed.state.tokens.refreshToken || null;
+            console.log('API Service: Loaded tokens from auth-storage');
+            return;
+          }
+        } catch (parseError) {
+          console.warn('Failed to parse auth-storage:', parseError);
+        }
+      }
+
+      // Fallback to old storage key for backward compatibility
+      const tokenData = await AsyncStorage.getItem('auth_tokens');
+      if (tokenData) {
+        const parsed = JSON.parse(tokenData);
+        this.accessToken = parsed.accessToken || null;
+        this.refreshToken = parsed.refreshToken || null;
+        console.log('API Service: Loaded tokens from auth_tokens (fallback)');
+      }
     } catch (error) {
       console.error('Failed to load tokens:', error);
     }
@@ -56,8 +80,14 @@ export class ApiService {
   // Save tokens to storage
   private async saveTokens(accessToken: string, refreshToken: string) {
     try {
-      await AsyncStorage.setItem('accessToken', accessToken);
-      await AsyncStorage.setItem('refreshToken', refreshToken);
+      const tokenData = {
+        accessToken,
+        refreshToken,
+        storedAt: Date.now(),
+        expiresIn: 3600, // Default 1 hour
+        tokenType: 'Bearer'
+      };
+      await AsyncStorage.setItem('auth_tokens', JSON.stringify(tokenData));
       this.accessToken = accessToken;
       this.refreshToken = refreshToken;
     } catch (error) {
@@ -68,13 +98,25 @@ export class ApiService {
   // Clear tokens
   async clearTokens() {
     try {
-      await AsyncStorage.removeItem('accessToken');
-      await AsyncStorage.removeItem('refreshToken');
+      await AsyncStorage.removeItem('auth_tokens');
       this.accessToken = null;
       this.refreshToken = null;
     } catch (error) {
       console.error('Failed to clear tokens:', error);
     }
+  }
+
+  // Update tokens (called when auth store updates tokens)
+  async updateTokens(accessToken: string, refreshToken: string) {
+    console.log('API Service: Updating tokens');
+    console.log('API Service: New accessToken length:', accessToken?.length);
+    console.log('API Service: New refreshToken length:', refreshToken?.length);
+    
+    this.accessToken = accessToken;
+    this.refreshToken = refreshToken;
+    await this.saveTokens(accessToken, refreshToken);
+    
+    console.log('API Service: Tokens updated successfully');
   }
 
   // Get auth headers
@@ -85,6 +127,9 @@ export class ApiService {
 
     if (this.accessToken) {
       headers['Authorization'] = `Bearer ${this.accessToken}`;
+      console.log('API Service: Adding Authorization header with token length:', this.accessToken.length);
+    } else {
+      console.log('API Service: No access token available for Authorization header');
     }
 
     return headers;
@@ -95,7 +140,9 @@ export class ApiService {
     endpoint: string,
     options: RequestInit = {}
   ): Promise<T> {
-    const url = `${API_BASE_URL}${endpoint}`;
+    // Ensure proper URL construction with slash
+    const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+    const url = `${API_BASE_URL}${cleanEndpoint}`;
     const headers = this.getAuthHeaders();
 
     const config: RequestInit = {
@@ -108,6 +155,7 @@ export class ApiService {
 
     try {
       const response = await fetch(url, config);
+      
       const data = await response.json();
 
       if (!response.ok) {
@@ -251,13 +299,13 @@ export class ApiService {
   }
 
   // Coin/Transaction methods
-  async getCoinBalance(): Promise<ApiResponse<any>> {
-    return this.request<ApiResponse<any>>('/coins/balance');
+  async getCoinBalance(): Promise<any> {
+    return this.request<any>('/coins/balance');
   }
 
-  async getTransactions(searchParams?: any): Promise<ApiResponse<any>> {
+  async getTransactions(searchParams?: any): Promise<any> {
     const queryString = searchParams ? `?${new URLSearchParams(searchParams)}` : '';
-    return this.request<ApiResponse<any>>(`/coins/transactions${queryString}`);
+    return this.request<any>(`/coins/transactions${queryString}`);
   }
 
   async createEarnTransaction(transactionData: any): Promise<ApiResponse<any>> {

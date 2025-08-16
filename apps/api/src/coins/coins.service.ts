@@ -174,9 +174,12 @@ export class CoinsService {
   }
 
   async getUserBalance(userId: string): Promise<CoinBalance> {
+    console.log('[CoinsService] Getting balance for userId:', userId);
     let balance = await this.balanceRepository.findOne({ where: { userId } });
+    console.log('[CoinsService] Raw balance from DB:', balance);
 
     if (!balance) {
+      console.log('[CoinsService] No balance found, creating new balance record');
       // Create new balance record
       balance = this.balanceRepository.create({
         userId,
@@ -185,7 +188,19 @@ export class CoinsService {
         totalRedeemed: 0,
       });
       await this.balanceRepository.save(balance);
+      console.log('[CoinsService] Created new balance record:', balance);
     }
+
+    console.log('[CoinsService] Final balance object:', {
+      id: balance.id,
+      userId: balance.userId,
+      balance: balance.balance,
+      balanceType: typeof balance.balance,
+      totalEarned: balance.totalEarned,
+      totalEarnedType: typeof balance.totalEarned,
+      totalRedeemed: balance.totalRedeemed,
+      totalRedeemedType: typeof balance.totalRedeemed
+    });
 
     return balance;
   }

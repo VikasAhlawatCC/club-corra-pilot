@@ -1,4 +1,5 @@
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.4:3001';
+import { environment } from '../config/environment';
+import { apiService } from './api.service';
 
 interface UploadUrlRequest {
   fileName: string;
@@ -18,36 +19,8 @@ interface ConfirmUploadRequest {
 }
 
 class FileUploadService {
-  private async makeRequest<T>(
-    endpoint: string, 
-    options: RequestInit = {}
-  ): Promise<T> {
-    const url = `${API_BASE_URL}/files/${endpoint}`;
-    
-    const response = await fetch(url, {
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Platform': 'mobile',
-        'X-Client-Type': 'mobile',
-        'User-Agent': 'ClubCorra-Mobile/1.0.0',
-        ...options.headers,
-      },
-      ...options,
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-    }
-
-    return response.json();
-  }
-
   async getUploadUrl(request: UploadUrlRequest): Promise<UploadUrlResponse> {
-    const response = await this.makeRequest<Partial<UploadUrlResponse>>('upload-url', {
-      method: 'POST',
-      body: JSON.stringify(request),
-    });
+    const response = await apiService.post<Partial<UploadUrlResponse>>('/files/upload-url', request);
     
     if (!response.expiresAt || !response.uploadUrl || !response.fileKey) {
       throw new Error('Invalid response: missing required fields');
@@ -61,11 +34,7 @@ class FileUploadService {
   }
 
   async confirmUpload(request: ConfirmUploadRequest): Promise<any> {
-    const response = await this.makeRequest('confirm-upload', {
-      method: 'POST',
-      body: JSON.stringify(request),
-    });
-    
+    const response = await apiService.post('/files/confirm-upload', request);
     return response;
   }
 

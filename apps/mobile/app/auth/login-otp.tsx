@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Button, Card } from '@/components/common';
@@ -10,7 +10,8 @@ import { useAuthStore } from '@/stores/auth.store';
 import { formatIndianMobileNumber } from '@shared/utils';
 
 export default function LoginOtpScreen() {
-  const [mobileNumber, setMobileNumber] = useState('');
+  const params = useLocalSearchParams();
+  const [mobileNumber, setMobileNumber] = useState(params.mobileNumber as string || '');
   const [otp, setOtp] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isOtpSent, setIsOtpSent] = useState(false);
@@ -25,6 +26,8 @@ export default function LoginOtpScreen() {
       return () => clearTimeout(timer);
     }
   }, [resendCountdown]);
+
+
 
   const handleSendOtp = async () => {
     if (!mobileNumber || mobileNumber.length < 10) {
@@ -156,8 +159,18 @@ export default function LoginOtpScreen() {
                     onChangeText={setMobileNumber}
                     keyboardType="phone-pad"
                     maxLength={10}
+                    editable={true}
                   />
                 </View>
+                {params.mobileNumber ? (
+                  <Text style={styles.disabledNote}>
+                    Mobile number pre-filled from login page (you can edit if needed). Click "Send OTP" to receive verification code.
+                  </Text>
+                ) : (
+                  <Text style={styles.disabledNote}>
+                    Enter your mobile number and click "Send OTP" to receive verification code.
+                  </Text>
+                )}
               </View>
             ) : (
               /* OTP Input */
@@ -353,6 +366,15 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.lg,
     color: colors.text.input,
     fontFamily: typography.fontFamily.medium,
+  },
+
+  disabledNote: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.secondary,
+    fontFamily: typography.fontFamily.medium,
+    marginTop: spacing[2],
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
   sendOtpButton: {
     marginBottom: spacing[4],

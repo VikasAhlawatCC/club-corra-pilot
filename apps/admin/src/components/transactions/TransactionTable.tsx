@@ -194,7 +194,7 @@ export function TransactionTable({
     // Re-enable row clicks after modal is fully open
     setTimeout(() => {
       setIsRowClickable(true)
-    }, 500) // Reduced from 800ms to 500ms
+    }, 800) // Increased from 500ms to 800ms for better stability
   }, [onTransactionSelect, isRowClickable])
 
   if (isLoading) {
